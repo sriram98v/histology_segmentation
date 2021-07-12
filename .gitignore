@@ -2,3 +2,11 @@ Images/*
 .ipynb_checkpoints/
 *.json
 npGraph
+histology_dataset
+images
+old_dataset
+*__pycache__*
+*.png
+*.zip
+*.joblib
+*.txt
