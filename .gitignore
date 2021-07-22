@@ -10,3 +10,5 @@ old_dataset
 *.zip
 *.joblib
 *.txt
+checkpoints/*
+

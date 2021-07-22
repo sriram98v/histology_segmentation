@@ -2,16 +2,13 @@ import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from lvh import *
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -25,11 +22,7 @@ class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceBCELoss, self).__init__()
 
-    def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
+    def forward(self, inputs, targets, smooth=1):      
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -47,10 +40,6 @@ class IoULoss(nn.Module):
         super(IoULoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -73,10 +62,6 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, inputs, targets):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -97,14 +82,12 @@ class TverskyLoss(nn.Module):
         self.smooth = smooth
 
     def forward(self, inputs, targets):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
-        
+        # rvers with Nvidia 1080Ti and Tesla V100 cards for molecular dynamics, deep learning, etc.
+
+
         #True Positives, False Positives & False Negatives
         TP = (inputs * targets).sum()    
         FP = ((1-targets) * inputs).sum()
@@ -124,10 +107,6 @@ class FocalTverskyLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, inputs, targets):
-        
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
         #flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)

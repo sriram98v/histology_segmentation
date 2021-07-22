@@ -10,10 +10,10 @@ from torch.utils.data import DataLoader, random_split
 from torch import optim
 from tqdm import tqdm
 
-VAL_PERCENT = 0.1
+VAL_PERCENT = 0.3
 EPOCHS = 100
 BATCH_SIZE = 32
-LR = 0.1
+LR = 5e-5
 
 cp_dir = "./checkpoints/"
 
@@ -29,11 +29,15 @@ val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_worke
 # model = UNet(1, dataset.num_classes)
 model = FPN(in_channels=1, classes=dataset.num_classes)
 model.to(device=device)
-criterion = FocalLoss()
+criterion = TverskyLoss(alpha=0.3, beta=0.7, smooth=1)
 optimizer = optim.RMSprop(model.parameters(), lr=LR, weight_decay=1e-8, momentum=0.9)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
-# writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
+# log_interval = 10
+
+# writer = SummaryWriter()
+
+# global_step = 0
 
 # logging.info(f'''Starting training:
 #         Epochs:          {EPOCHS}
@@ -67,6 +71,9 @@ for epoch in range(EPOCHS):
             optimizer.step()
 
             pbar.update(imgs.shape[0])
+            
+            # if global_step%log_interval==0:
+            #     writer.add_scalar('Loss/train', np.random.random(), n_iter)
     
     model.eval()
     val_loss = 0
@@ -78,14 +85,13 @@ for epoch in range(EPOCHS):
             loss = criterion(pred_mask, true_masks)
             val_loss += loss.item()
 
-            pbar2.set_postfix(**{'Val_loss': val_loss/n_val})
+            pbar2.set_postfix(**{'Avg Val_loss': val_loss/n_val})
 
             pbar2.update(imgs.shape[0])
-        
-    if val_loss<=best_loss:
-        best_loss = val_loss
-        torch.save(model.state_dict(), cp_dir + f'best_model_{str(val_loss)}.pth')
-        print("Loss improved. Saved Checkpoint")
+    
+    scheduler.step(val_loss/n_val)
+    torch.save(model.state_dict(), cp_dir + f'model_ep{str(epoch)}_{str(val_loss)}.pth')
+    print(f"Saved Checkpoint. Val_loss_{val_loss}")
 
 torch.save(model.state_dict(), cp_dir + f'Final_model.pth')
 print("Done")

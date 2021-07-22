@@ -6,7 +6,7 @@ import cv2
 
 
 class histologyDataset(Dataset):
-    def __init__(self, imgs_dir, gt_dir, classes=None, augs=None):
+    def __init__(self, imgs_dir, gt_dir, classes=None, transform=None):
         self.imgs_dir = imgs_dir
         self.masks_dir = gt_dir
         if classes:
@@ -16,7 +16,7 @@ class histologyDataset(Dataset):
         self.num_classes = len(self.classes)
         self.classes.sort()
         self.im_names = os.listdir(self.imgs_dir)
-        self.augs = augs
+        self.transform = transform
 
     def __len__(self):
         return len(self.im_names)
@@ -28,7 +28,10 @@ class histologyDataset(Dataset):
         img = np.expand_dims(cv2.imread(os.path.join(self.imgs_dir, im_name), 0), axis=0)
         mask = np.array([cv2.imread(i, 0) for i in gt_names])
 
-        return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask).type(torch.FloatTensor)
-        }
+        sample =  {'image': torch.from_numpy(img/255).type(torch.FloatTensor),
+                'mask': torch.from_numpy(mask/255).type(torch.FloatTensor)}
+
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample

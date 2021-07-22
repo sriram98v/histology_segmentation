@@ -10,7 +10,7 @@ class FPN(SegmentationModel):
         self,
         encoder_name: str = "resnet34",
         encoder_depth: int = 5,
-        encoder_weights: Optional[str] = "imagenet",
+        encoder_weights: Optional[str] = None,
         decoder_pyramid_channels: int = 256,
         decoder_segmentation_channels: int = 128,
         decoder_merge_policy: str = "add",
