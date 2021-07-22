@@ -11,4 +11,4 @@ old_dataset
 *.joblib
 *.txt
 checkpoints/*
-
+*.pth
