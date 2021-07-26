@@ -26,10 +26,14 @@ class histologyDataset(Dataset):
         gt_names = [os.path.join(self.masks_dir, gt_class, im_name) for gt_class in self.classes]
         
         img = np.expand_dims(cv2.imread(os.path.join(self.imgs_dir, im_name), 0), axis=0)
-        mask = np.array([cv2.imread(i, 0) for i in gt_names])
+        # mask = np.array([cv2.imread(i, 0) for i in gt_names])
+
+        mask = np.zeros(img[0].shape)
+        for n,i in enumerate(gt_names):
+            mask[np.where(cv2.imread(i, 0)==255)] = n+1
 
         sample =  {'image': torch.from_numpy(img/255).type(torch.FloatTensor),
-                'mask': torch.from_numpy(mask/255).type(torch.FloatTensor)}
+                'mask': torch.from_numpy(np.expand_dims(mask, axis=0)).type(torch.LongTensor)}
 
         if self.transform:
             sample = self.transform(sample)

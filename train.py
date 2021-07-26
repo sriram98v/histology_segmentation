@@ -27,9 +27,9 @@ train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_wo
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
 # model = UNet(1, dataset.num_classes)
-model = FPN(in_channels=1, classes=dataset.num_classes)
+model = FPN(in_channels=1, classes=1)
 model.to(device=device)
-criterion = TverskyLoss(alpha=0.3, beta=0.7, smooth=1)
+criterion = FocalTverskyLoss(alpha=0.3, beta=0.7, smooth=1)
 optimizer = optim.RMSprop(model.parameters(), lr=LR, weight_decay=1e-8, momentum=0.9)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
@@ -49,7 +49,6 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 #         Device:          {device.type}
 #     ''')
 
-best_loss = float('inf')
 
 for epoch in range(EPOCHS):
     model.train()
