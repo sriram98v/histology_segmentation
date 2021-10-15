@@ -12,3 +12,7 @@ old_dataset
 *.txt
 checkpoints/*
 *.pth
+test_images/*
+*.ipynb
+Kvasir-SEG
+human_examples/

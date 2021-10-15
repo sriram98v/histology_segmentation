@@ -6,7 +6,7 @@ import cv2
 
 
 class histologyDataset(Dataset):
-    def __init__(self, imgs_dir, gt_dir, classes=None, transform=None):
+    def __init__(self, imgs_dir, gt_dir, classes=None, transform=None, color=False):
         self.imgs_dir = imgs_dir
         self.masks_dir = gt_dir
         if classes:
@@ -17,6 +17,7 @@ class histologyDataset(Dataset):
         self.classes.sort()
         self.im_names = os.listdir(self.imgs_dir)
         self.transform = transform
+        self.color = color
 
     def __len__(self):
         return len(self.im_names)
@@ -25,15 +26,15 @@ class histologyDataset(Dataset):
         im_name = self.im_names[idx]
         gt_names = [os.path.join(self.masks_dir, gt_class, im_name) for gt_class in self.classes]
         
-        img = np.expand_dims(cv2.imread(os.path.join(self.imgs_dir, im_name), 0), axis=0)
-        # mask = np.array([cv2.imread(i, 0) for i in gt_names])
+        if self.color:
+            img = cv2.imread(os.path.join(self.imgs_dir, im_name))
+            img = np.moveaxis(img, -1, 0)
+        else:
+            img = cv2.imread(os.path.join(self.imgs_dir, im_name), 0)
+            img = np.expand_dims(img, axis=0)
+        mask = np.array([cv2.imread(i, 0) for i in gt_names])
 
-        mask = np.zeros(img[0].shape)
-        for n,i in enumerate(gt_names):
-            mask[np.where(cv2.imread(i, 0)==255)] = n+1
-
-        sample =  {'image': torch.from_numpy(img/255).type(torch.FloatTensor),
-                'mask': torch.from_numpy(np.expand_dims(mask, axis=0)).type(torch.LongTensor)}
+        sample = {"image":img/255, "mask":mask/255}
 
         if self.transform:
             sample = self.transform(sample)

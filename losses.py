@@ -99,7 +99,7 @@ class TverskyLoss(nn.Module):
 
 
 class FocalTverskyLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True, alpha=0.5, beta=0.5, smooth=1, gamma=1):
+    def __init__(self, alpha=0.5, beta=0.5, smooth=1, gamma=1):
         super(FocalTverskyLoss, self).__init__()
         self.alpha = alpha
         self.beta = beta
@@ -129,3 +129,28 @@ class LovaszHingeLoss(nn.Module):
         inputs = F.sigmoid(inputs)    
         Lovasz = lovasz_hinge(inputs, targets, per_image=False)                       
         return Lovasz
+
+class ComboLoss(nn.Module):
+    def __init__(self, alpha=0.5, smooth=1, eps=1e-9, ce_ratio=0.5):
+        super(ComboLoss, self).__init__()
+        self.ce_ratio = ce_ratio
+        self.alpha = alpha
+        self.smooth = smooth
+        self.eps = eps
+
+    def forward(self, inputs, targets):
+        
+        #flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+        
+        #True Positives, False Positives & False Negatives
+        intersection = (inputs * targets).sum()    
+        dice = (2. * intersection + self.smooth) / (inputs.sum() + targets.sum() + self.smooth)
+        
+        inputs = torch.clamp(inputs, self.eps, 1.0 - self.eps)       
+        out = - (self.alpha * ((targets * torch.log(inputs)) + ((1 - self.alpha) * (1.0 - targets) * torch.log(1.0 - inputs))))
+        weighted_ce = out.mean(-1)
+        combo = (self.ce_ratio * weighted_ce) - ((1 - self.ce_ratio) * dice)
+        
+        return combo

@@ -5,22 +5,21 @@ from segmentation_models_pytorch.encoders import get_encoder
 
 
 
-class FPN(SegmentationModel):
+class PSPNet(SegmentationModel):
 
     def __init__(
         self,
-        encoder_name: str = "resnet34",
-        encoder_depth: int = 5,
-        encoder_weights: Optional[str] = None,
-        decoder_pyramid_channels: int = 256,
-        decoder_segmentation_channels: int = 128,
-        decoder_merge_policy: str = "add",
-        decoder_dropout: float = 0.2,
-        in_channels: int = 1,
-        classes: int = 1,
-        activation: Optional[str] = None,
-        upsampling: int = 4,
-        aux_params: Optional[dict] = None,
+        encoder_name: str = 'resnet34',
+        encoder_weights: Optional[str] = 'imagenet', 
+        encoder_depth: int = 3, 
+        psp_out_channels: int = 512, 
+        psp_use_batchnorm: bool = True, 
+        psp_dropout: float = 0.2, 
+        in_channels: int = 3, 
+        classes: int = 1, 
+        activation: Union[str, callable, None] = None, 
+        upsampling: int = 8, 
+        aux_params: Optional[dict] = None
     ):
         super().__init__()
 
