@@ -25,6 +25,6 @@ def highlight_im(im, mask, threshold=0.5):
 
     b,g,r = cv2.split(im)
 
-    r = cv2.add(b, 90, dst = b, mask = binary, dtype = cv2.CV_8U)
+    r = cv2.add(b, 90, dst = r, mask = binary, dtype = cv2.CV_8U)
 
     return cv2.merge((b,g,r), im)

@@ -10,6 +10,8 @@ old_dataset
 *.zip
 *.joblib
 *.txt
+*.ipynb
+*.pdf
 checkpoints/*
 *.pth
 test_images/*

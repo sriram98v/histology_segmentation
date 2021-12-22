@@ -20,7 +20,7 @@ import segmentation_models_pytorch as sm
 
 VAL_PERCENT = 0.4
 EPOCHS = 100
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 LR = 5e-5
 
 cp_dir = "./checkpoints/"
