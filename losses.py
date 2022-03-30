@@ -154,3 +154,42 @@ class ComboLoss(nn.Module):
         combo = (self.ce_ratio * weighted_ce) - ((1 - self.ce_ratio) * dice)
         
         return combo
+
+
+class ELBO(nn.Module):
+    def __init__(self, train_size):
+        super(ELBO, self).__init__()
+        self.train_size = train_size
+
+    def forward(self, input, target, kl, beta):
+        assert not target.requires_grad
+        # print(input.shape, target.shape)
+        return F.nll_loss(input, torch.argmax(target, dim=1), reduction='mean') * self.train_size + beta * kl
+
+class ELBO_FocalTverskyLoss(nn.Module):
+    def __init__(self, alpha=0.5, beta=0.5, smooth=1, gamma=1):
+        super(ELBO_FocalTverskyLoss, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.smooth = smooth
+        self.gamma = gamma
+        # self.train_size = train_size
+        # self.val = False
+
+    def forward(self, inputs, targets, kl, beta=1e-7):
+        #flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+        
+        #True Positives, False Positives & False Negatives
+        TP = (inputs * targets).sum()    
+        FP = ((1-targets) * inputs).sum()
+        FN = (targets * (1-inputs)).sum()
+        
+        Tversky = (TP + self.smooth) / (TP + self.alpha*FP + self.beta*FN + self.smooth)  
+        FocalTversky = (1 - Tversky)**self.gamma
+        
+        # if self.val:
+        #     return FocalTversky
+        # else:
+        return FocalTversky + beta * kl

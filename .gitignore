@@ -20,3 +20,4 @@ Kvasir-SEG
 human_examples/
 papers/
 Grants/
+*.csv

@@ -29,7 +29,7 @@ class Resize(object):
         image, mask = torch.unsqueeze(sample['image'], 0), torch.unsqueeze(sample['mask'], 0)
 
         return {'image': torch.squeeze(nn.functional.interpolate(image, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners, recompute_scale_factor=self.recompute_scale_factor)),
-                'mask': torch.squeeze(nn.functional.interpolate(mask, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners, recompute_scale_factor=self.recompute_scale_factor))
+                'mask': (torch.squeeze(nn.functional.interpolate(mask, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners, recompute_scale_factor=self.recompute_scale_factor))>0.5).to(torch.int)
                 }
 
 class Rotate(object):
