@@ -21,3 +21,6 @@ human_examples/
 papers/
 Grants/
 *.csv
+content/*
+data/*
+output/*
