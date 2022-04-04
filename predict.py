@@ -15,7 +15,7 @@ import sys
 
 def init_model(args):
     try:
-        model = Bayesian_UNet(3, 5, classes=os.listdir("./histology_dataset/30/train/GT/"))
+        model = Bayesian_UNet(3, 5)
         device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
         model.to(device)
         model.load_state_dict(torch.load(args.model, map_location=device))
