@@ -58,7 +58,7 @@ def output_im(im, window_size = 512, step_size = 256, size=(256, 256)):
         outs = model(batch)
     
     outs = nn.functional.interpolate(outs, size=(512, 512), 
-                                     scale_factor=None, mode='bilinear', align_corners=True, recompute_scale_factor=None).to(device="cpu").numpy()
+                                     scale_factor=None, mode='bilinear', align_corners=True, recompute_scale_factor=None).detach().cpu().numpy()
     out = np.zeros((5, im_h, im_w))
     n = 0
     for i in range(0, im_h-window_size, 256):
@@ -134,7 +134,7 @@ def make_outs(im, out, args, im_name):
     # axs[0, 0].set_title(i, fontsize=50)
     for n,i in enumerate(range(out.shape[0])):
         axs[int(i/3)+1, int(i%3)].imshow(highlight_im(im.copy(), out[i].copy(), threshold=0.5))
-        axs[int(i/3)+1, int(i%3)].set_title(model.classes[n])
+        # axs[int(i/3)+1, int(i%3)].set_title(model.classes[n])
     
     fig.savefig(os.path.join(args.out_dir, im_name.split("/")[-1]))
     # fig.close()
