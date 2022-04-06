@@ -12,10 +12,13 @@ from bayesian_seg import Bayesian_UNet
 from tqdm import tqdm
 import argparse
 import sys
+import json
 
 def init_model(args):
     try:
-        model = Bayesian_UNet(3, 5)
+        with open(args.classes, 'r') as f:
+            classes = json.load(f)
+        model = Bayesian_UNet(3, 5, classes=classes)
         device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
         model.to(device)
         model.load_state_dict(torch.load(args.model, map_location=device))
@@ -30,6 +33,7 @@ def get_args():
     parser.add_argument('-o', '--out-dir', type=str, default="./output/", help='Output Directory', dest='out_dir')
     parser.add_argument('-m', '--model', type=str, default="./model.pth", help='Pretrained model', dest='model')
     parser.add_argument('-d', '--device', type=str, default='cpu', help='device', dest='device')
+    parser.add_argument('-c', '--classes', type=str, default='None', help='Classes file', dest='classes')
 
 
     
@@ -134,9 +138,9 @@ def make_outs(im, out, args, im_name):
     # axs[0, 0].set_title(i, fontsize=50)
     for n,i in enumerate(range(out.shape[0])):
         axs[int(i/3)+1, int(i%3)].imshow(highlight_im(im.copy(), out[i].copy(), threshold=0.5))
-        # axs[int(i/3)+1, int(i%3)].set_title(model.classes[n])
+        axs[int(i/3)+1, int(i%3)].set_title(model.classes[n])
     
-    fig.savefig(os.path.join(args.out_dir, im_name.split("/")[-1]))
+    fig.savefig(os.path.join(args.out_dir, im_name.split("/")[-1])+".png")
     # fig.close()
 
 if __name__=="__main__":

@@ -20,7 +20,7 @@ class BaseConv2d(nn.Module):
         self.dilation = dilation
         self.groups = 1
         self.use_bias = bias
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda")
         self.mode=mode
 
         if priors is None:
