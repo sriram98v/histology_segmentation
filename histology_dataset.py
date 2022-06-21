@@ -1,12 +1,11 @@
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 import os
 import cv2
 
 
 class histologyDataset(Dataset):
-    def __init__(self, imgs_dir, gt_dir, classes=None, transform=None, color=False):
+    def __init__(self, imgs_dir, gt_dir, classes=None, transform=None, color=False, im_names=None):
         self.imgs_dir = imgs_dir
         self.masks_dir = gt_dir
         if classes:
@@ -15,7 +14,10 @@ class histologyDataset(Dataset):
             self.classes = os.listdir(gt_dir)
         self.num_classes = len(self.classes)
         self.classes.sort()
-        self.im_names = os.listdir(self.imgs_dir)
+        if im_names == None:
+            self.im_names = os.listdir(self.imgs_dir)
+        else:
+            self.im_names = im_names
         self.transform = transform
         self.color = color
 
@@ -40,3 +42,14 @@ class histologyDataset(Dataset):
             sample = self.transform(sample)
 
         return sample
+    
+    def append_ims(self, new_ims):
+        self.im_names += new_ims
+
+    def remove_ims(self, im_list):
+        for i in im_list:
+            self.im_names.remove(i[0])
+
+    def im_name(self, idx):
+        return self.im_names[idx]
+

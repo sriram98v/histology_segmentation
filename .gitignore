@@ -25,3 +25,5 @@ content/*
 data/*
 output/*
 input/*
+*.svs
+*.jpeg

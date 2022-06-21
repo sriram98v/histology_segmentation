@@ -129,7 +129,7 @@ class DoubleConv(nn.Module):
             BaseConv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            CustomDropout(p=p)
+            # CustomDropout(p=p)
         )
 
     def forward(self, x):
@@ -221,3 +221,7 @@ class Bayesian_UNet(ModuleWrapper):
         x = self.up3(x, x1)
         logits = self.outc(x)
         return logits
+
+    def toCPU(self):
+        for param in self.parameters():
+            param.device("cpu")

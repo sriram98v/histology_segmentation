@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import logging
 from bayesian_seg import *
 from losses import *
 from histology_dataset import histologyDataset
@@ -10,13 +9,11 @@ from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
 from augs import *
-import segmentation_models_pytorch as sm
-import metrics
-from torchsummary import summary
+from metrics import get_TI
 
 
 VAL_PERCENT = 0.4
-EPOCHS = 100
+EPOCHS = 200
 BATCH_SIZE = 8
 LR = 5e-4
 
@@ -25,7 +22,10 @@ writer=SummaryWriter('content/logsdir')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]))
+dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
+                            transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            classes=['AS', 'Cartilage', 'RS', 'SM'])
+
 n_val = int(len(dataset) * VAL_PERCENT)
 n_train = len(dataset) - n_val
 train_set, val_set = random_split(dataset, [n_train, n_val])
@@ -46,6 +46,7 @@ for epoch in range(EPOCHS):
     model.train()
     epoch_loss = 0
     kl = 0
+    total_TI = 0
     
     with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
         for i, batch in enumerate(train_loader, 1):
@@ -55,6 +56,7 @@ for epoch in range(EPOCHS):
             pred_mask  = model(imgs)
             # kl_ = model.get_kl()
             loss = criterion(pred_mask, true_masks, model.get_kl(), beta=1e-7)
+            total_TI += (1 - get_TI(pred=pred_mask, true=true_masks, alpha=1, beta=1, smooth=0, gamma=1).item())
             epoch_loss += loss.item()
             kl += model.get_kl()
 
@@ -72,10 +74,15 @@ for epoch in range(EPOCHS):
     writer.add_scalar('KL Divergence',
                         kl/len(train_loader),
                         epoch)
+    
+    writer.add_scalar('Training mIOU',
+                        total_TI/len(train_loader),
+                        epoch)
 
     
     model.eval()
     val_loss = 0
+    total_TI *= 0
     with tqdm(total=n_val, desc=f'Validation', unit='img') as pbar2:
         for i, batch in enumerate(val_loader, 1):
             imgs = batch['image'].to(device=device, dtype=torch.float32)
@@ -84,6 +91,7 @@ for epoch in range(EPOCHS):
             kl_ = model.get_kl()
             loss = criterion(pred_mask, true_masks, model.get_kl(), beta=1e-7)
             val_loss += loss.item()
+            total_TI += (1 - get_TI(pred=pred_mask, true=true_masks, alpha=1, beta=1, smooth=0, gamma=1).item())
 
             pbar2.set_postfix(**{'Avg Val_loss': loss.item()})
 
@@ -91,7 +99,10 @@ for epoch in range(EPOCHS):
     writer.add_scalar('val loss',
                             val_loss/len(val_loader),
                             epoch)
-            
+
+    writer.add_scalar('Validation mIOU',
+                        total_TI/len(train_loader),
+                        epoch)            
     
     scheduler.step(val_loss/n_val)
     torch.save(model.state_dict(), cp_dir + f'model_ep{str(epoch)}_{str(val_loss/len(val_loader))}.pth')
