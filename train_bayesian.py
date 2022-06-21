@@ -20,7 +20,7 @@ LR = 5e-4
 cp_dir = "./checkpoints/"
 writer=SummaryWriter('content/logsdir')
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
                             transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
@@ -32,7 +32,7 @@ train_set, val_set = random_split(dataset, [n_train, n_val])
 train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
 
-model = Bayesian_UNet(3, dataset.num_classes, classes=dataset.classes)
+model = Bayesian_UNet(3, dataset.num_classes, classes=dataset.classes, device=device)
 model.to(device=device)
 model.switch_custom_dropout(activate=False)
 model.mode("train")

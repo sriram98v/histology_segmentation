@@ -10,7 +10,7 @@ from metrics import calculate_kl as KL_DIV
 class BaseConv2d(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, bias=True, priors=None, mode="train"):
+                 padding=0, dilation=1, bias=True, priors=None, mode="train", device=torch.device('cpu')):
         super(BaseConv2d, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -20,7 +20,7 @@ class BaseConv2d(nn.Module):
         self.dilation = dilation
         self.groups = 1
         self.use_bias = bias
-        self.device = torch.device("cuda")
+        self.device = device
         self.mode=mode
 
         if priors is None:
@@ -118,15 +118,15 @@ class CustomDropout(nn.Module):
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, mid_channels=None, p=0.3):
+    def __init__(self, in_channels, out_channels, mid_channels=None, p=0.3, device=torch.device('cpu')):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
-            BaseConv2d(in_channels, mid_channels, kernel_size=3, padding=1),
+            BaseConv2d(in_channels, mid_channels, kernel_size=3, padding=1, device=device),
             nn.BatchNorm2d(mid_channels),
             nn.ReLU(inplace=True),
-            BaseConv2d(mid_channels, out_channels, kernel_size=3, padding=1),
+            BaseConv2d(mid_channels, out_channels, kernel_size=3, padding=1, device=device),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             # CustomDropout(p=p)
@@ -139,11 +139,11 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, device=torch.device('cpu')):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            DoubleConv(in_channels, out_channels, device=device)
         )
 
     def forward(self, x):
@@ -153,16 +153,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, bilinear=True, device=torch.device('cpu')):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, device=device)
         else:
             self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, device=device)
 
 
     def forward(self, x1, x2):
@@ -181,9 +181,9 @@ class Up(nn.Module):
 
 
 class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels,device=torch.device('cpu')):
         super(OutConv, self).__init__()
-        self.conv = BaseConv2d(in_channels, out_channels, kernel_size=1)
+        self.conv = BaseConv2d(in_channels, out_channels, kernel_size=1, device=device)
         self.out = nn.Sigmoid()
 
     def forward(self, x):
@@ -194,22 +194,22 @@ class Bayesian_UNet(ModuleWrapper):
     def __str__(self):
         return "BaysianUNet"
 
-    def __init__(self, n_channels, n_classes, bilinear=True, classes=None):
+    def __init__(self, n_channels, n_classes, bilinear=True, classes=None, device=torch.device('cpu')):
         super(Bayesian_UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
         self.classes = classes
 
-        self.inc = DoubleConv(n_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
+        self.inc = DoubleConv(n_channels, 64, device=device)
+        self.down1 = Down(64, 128, device=device)
+        self.down2 = Down(128, 256, device=device)
         factor = 2 if bilinear else 1
-        self.down3 = Down(256, 512 // factor)
-        self.up1 = Up(512, 256 // factor, bilinear)
-        self.up2 = Up(256, 128 // factor, bilinear)
-        self.up3 = Up(128, 64, bilinear)
-        self.outc = OutConv(64, n_classes)
+        self.down3 = Down(256, 512 // factor, device=device)
+        self.up1 = Up(512, 256 // factor, bilinear, device=device)
+        self.up2 = Up(256, 128 // factor, bilinear, device=device)
+        self.up3 = Up(128, 64, bilinear, device=device)
+        self.outc = OutConv(64, n_classes, device=device)
 
     def forward(self, x):
         x1 = self.inc(x)
