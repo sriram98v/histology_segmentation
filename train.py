@@ -1,20 +1,16 @@
 import torch
 import torch.nn as nn
 import logging
-from unet import UNet
-from bayesian_seg import Bayesian_UNet
-from Fpn import FPN
-from pspnet import PSPNet
-from deeplab import deeplabv3
-from losses import *
-from histology_dataset import histologyDataset
+from BayesianSeg.models.bayes_unet import *
+from BayesianSeg.loss.losses import *
+from BayesianSeg.datasets.histology_dataset import histologyDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
 from torchvision.models.segmentation import deeplabv3_resnet101
-from augs import *
+from BayesianSeg.datasets.augs import *
 import segmentation_models_pytorch as sm
 from torch.utils.tensorboard import SummaryWriter
 writer=SummaryWriter('content/logsdir')

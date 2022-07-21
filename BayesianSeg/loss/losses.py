@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from lvh import *
 from torch.nn import _reduction as _Reduction
 
-import metrics as BF
+import BayesianSeg.metrics.metrics as BF
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):

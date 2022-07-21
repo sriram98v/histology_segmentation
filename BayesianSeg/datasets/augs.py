@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
-from misc import *
+from BayesianSeg.misc import *
 
 
 class ToTensor(object):

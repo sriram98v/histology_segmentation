@@ -1,8 +1,6 @@
 import torch.nn as nn
-from misc import ModuleWrapper
 import torch
 import torch.nn.functional as F
-from torch.nn import Parameter
 from modules.conv import BayesConv2d
 
 class DoubleConv(nn.Module):
@@ -74,7 +72,7 @@ class OutConv(nn.Module):
         return self.out(self.conv(x))
 
 
-class Bayesian_UNet(ModuleWrapper):
+class Bayesian_UNet(nn.Module):
     def __str__(self):
         return "BaysianUNet"
 

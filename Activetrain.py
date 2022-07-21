@@ -1,19 +1,19 @@
 import torch
-from bayesian_seg import *
-from losses import *
-from histology_dataset import histologyDataset
+from BayesianSeg.loss.losses import *
+from BayesianSeg.datasets.histology_dataset import histologyDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
+from BayesianSeg.models.bayes_unet import *
 from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
-from augs import *
+from BayesianSeg.datasets.augs import *
 import os
 import math
 import random
 
 
-from metrics import get_TI, get_entropies
+from BayesianSeg.metrics.metrics import get_TI, get_entropies
 
 
 LABEL_PERCENT = 0.05

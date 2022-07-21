@@ -1,14 +1,13 @@
 import numpy as np
 import torch
-from bayesian_seg import *
+from BayesianSeg.models.bayes_unet import *
 import cv2
 import matplotlib.pyplot as plt
 import math
 import os
 import torch.nn as nn
 from skimage.segmentation import slic
-from misc import *
-from bayesian_seg import Bayesian_UNet
+from BayesianSeg.misc import *
 from tqdm import tqdm
 import argparse
 import sys

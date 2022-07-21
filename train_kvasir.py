@@ -1,14 +1,14 @@
 import torch
-from bayes_unet import *
-from losses import *
-from kvasir_dataset import kvasirDataset
+from BayesianSeg.models.bayes_unet import *
+from BayesianSeg.loss.losses import *
+from BayesianSeg.datasets.kvasir_dataset import kvasirDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
-from augs import *
-from metrics import get_TI
+from BayesianSeg.datasets.augs import *
+from BayesianSeg.metrics.metrics import get_TI
 
 VAL_PERCENT = 0.4
 EPOCHS = 500
