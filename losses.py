@@ -3,6 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from lvh import *
+from torch.nn import _reduction as _Reduction
+
+import metrics as BF
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
@@ -221,3 +224,32 @@ class ELBO_FocalLogTverskyLoss(nn.Module):
         #     return FocalTversky
         # else:
         return FocalTversky + beta * kl
+
+
+class _Loss(nn.Module):
+    def __init__(self, reduction='mean'):
+        super(_Loss, self).__init__()
+        self.reduction = reduction
+            
+class BKLLoss(_Loss):
+    """
+    Loss for calculating KL divergence of baysian neural network model.
+    Arguments:
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            ``'mean'``: the sum of the output will be divided by the number of
+            elements of the output.
+            ``'sum'``: the output will be summed.
+        last_layer_only (Bool): True for return only the last layer's KL divergence.    
+    """
+    __constants__ = ['reduction']
+
+    def __init__(self, reduction='mean', last_layer_only=False):
+        super(BKLLoss, self).__init__(reduction)
+        self.last_layer_only = last_layer_only
+
+    def forward(self, model):
+        """
+        Arguments:
+            model (nn.Module): a model to be calculated for KL-divergence.
+        """
+        return BF.bayesian_kl_loss(model, reduction=self.reduction, last_layer_only=self.last_layer_only)

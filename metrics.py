@@ -4,6 +4,7 @@ from torch import nn
 import torch
 import math
 from skimage.segmentation import slic
+from modules.conv import *
 
 
 def calculate_kl(mu_q, sig_q, mu_p, sig_p):
@@ -83,3 +84,54 @@ def get_entropies(im, preds, max_iter=20):
         
 #     return segments
     return [sp_mean(get_epistemic(preds), segments), sp_mean(get_aleatoric(preds), segments), sp_mean(get_div(preds), segments)]
+
+def _kl_loss(mu_0, log_sigma_0, mu_1, log_sigma_1) :
+    """
+    An method for calculating KL divergence between two Normal distribtuion.
+    Arguments:
+        mu_0 (Float) : mean of normal distribution.
+        log_sigma_0 (Float): log(standard deviation of normal distribution).
+        mu_1 (Float): mean of normal distribution.
+        log_sigma_1 (Float): log(standard deviation of normal distribution).
+   
+    """
+    kl = log_sigma_1 - log_sigma_0 + (torch.exp(log_sigma_0)**2 + (mu_0-mu_1)**2)/(2*math.exp(log_sigma_1)**2) - 0.5
+    return kl.sum()
+
+def bayesian_kl_loss(model, reduction='mean', last_layer_only=False) :
+    """
+    An method for calculating KL divergence of whole layers in the model.
+    Arguments:
+        model (nn.Module): a model to be calculated for KL-divergence.
+        reduction (string, optional): Specifies the reduction to apply to the output:
+            ``'mean'``: the sum of the output will be divided by the number of
+            elements of the output.
+            ``'sum'``: the output will be summed.
+        last_layer_only (Bool): True for return only the last layer's KL divergence.    
+        
+    """
+    device = torch.device("cuda" if next(model.parameters()).is_cuda else "cpu")
+    kl = torch.Tensor([0]).to(device)
+    kl_sum = torch.Tensor([0]).to(device)
+    n = torch.Tensor([0]).to(device)
+
+    for m in model.modules() :
+        if isinstance(m, BayesConv2d):
+            kl = _kl_loss(m.W_mu, m.W_rho, m.prior_mu, m.prior_log_sigma)
+            kl_sum += kl
+            n += len(m.W_mu.view(-1))
+
+            if m.bias :
+                kl = _kl_loss(m.bias_mu, m.bias_rho, m.prior_mu, m.prior_log_sigma)
+                kl_sum += kl
+                n += len(m.bias_mu.view(-1))
+
+    if last_layer_only or n == 0 :
+        return kl
+    
+    if reduction == 'mean' :
+        return kl_sum/n
+    elif reduction == 'sum' :
+        return kl_sum
+    else :
+        raise ValueError(reduction + " is not valid")

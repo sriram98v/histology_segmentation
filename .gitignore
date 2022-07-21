@@ -27,3 +27,8 @@ output/*
 input/*
 *.svs
 *.jpeg
+*.tiff
+3dslices/
+SimpleElastix/
+build/
+modules/

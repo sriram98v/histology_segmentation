@@ -20,7 +20,7 @@ LR = 5e-4
 cp_dir = "./checkpoints/"
 writer=SummaryWriter('content/logsdir')
 
-device = torch.device('cpu')
+device = torch.device('cuda:0')
 
 dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
                             transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
@@ -103,6 +103,9 @@ for epoch in range(EPOCHS):
     writer.add_scalar('Validation mIOU',
                         total_TI/len(train_loader),
                         epoch)            
+    
+    # writer.add_image("input image", imgs)
+    # writer.add_image("predicted mask", pred_mask)
     
     scheduler.step(val_loss/n_val)
     torch.save(model.state_dict(), cp_dir + f'model_ep{str(epoch)}_{str(val_loss/len(val_loader))}.pth')
