@@ -28,7 +28,7 @@ input/*
 *.svs
 *.jpeg
 *.tiff
-3dslices/
+3dslices
 SimpleElastix/
 build/
 modules/
