@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from modules.conv import BayesConv2d
+from .. import modules
 
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, mid_channels=None):
@@ -9,10 +9,10 @@ class DoubleConv(nn.Module):
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
-            BayesConv2d(in_channels, mid_channels, kernel_size=3, padding=1),
+            modules.conv.BayesConv2d(in_channels, mid_channels, kernel_size=3, padding=1),
             # nn.BatchNorm2d(mid_channels),
             nn.ReLU(inplace=True),
-            BayesConv2d(mid_channels, out_channels, kernel_size=3, padding=1),
+            modules.conv.BayesConv2d(mid_channels, out_channels, kernel_size=3, padding=1),
             # nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             # CustomDropout(p=p)
@@ -65,7 +65,7 @@ class Up(nn.Module):
 class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
-        self.conv = BayesConv2d(in_channels, out_channels, kernel_size=1)
+        self.conv = modules.conv.BayesConv2d(in_channels, out_channels, kernel_size=1)
         self.out = nn.Sigmoid()
 
     def forward(self, x):
@@ -103,3 +103,5 @@ class Bayesian_UNet(nn.Module):
         x = self.up3(x, x1)
         logits = self.outc(x)
         return logits
+
+        

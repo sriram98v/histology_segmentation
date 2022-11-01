@@ -1,6 +1,6 @@
 import torch
 from BayesianSeg.loss.losses import *
-from BayesianSeg.datasets.histology_dataset import histologyDataset
+from BayesianSeg.datasets.kvasir_dataset import kvasirDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from BayesianSeg.models.bayes_unet import *
@@ -17,14 +17,17 @@ from BayesianSeg.metrics.metrics import IoU, get_entropies
 
 LABEL_PERCENT = 0.05
 VAL_PERCENT = 0.2
-EPOCHS = 500
-BATCH_SIZE = 8
-LR = 0.005
+EPOCHS = 300
+BATCH_SIZE = 16
+LR = 0.001
+DP = 0.5
 
-IMAGES = os.listdir(os.path.join("./histology_dataset/30/train/", "images"))
-CLASSES = ['AS', 'Cartilage', 'RS', 'SM']
+IMAGES = os.listdir(os.path.join("./Kvasir-SEG/", "images"))[:500]
+CLASSES = ['polyp']
 
 random.shuffle(IMAGES)
+
+IMAGES = IMAGES[:int(DP*len(IMAGES))]
 
 n_train = int(len(IMAGES) * (1-VAL_PERCENT))
 n_label = int(n_train * LABEL_PERCENT)
@@ -35,10 +38,9 @@ train_set = IMAGES[:n_train]
 label_set = train_set[:n_label]
 unlabel_set = train_set[n_label:]
 
-
-val_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=val_set)
+val_dataset = kvasirDataset("./Kvasir-SEG/images/", "./Kvasir-SEG/masks/", color=True, 
+                            transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            classes=['polyp'], im_names=val_set)
 
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
 
@@ -97,7 +99,7 @@ def train_model(label_set, active_epoch):
 def validate_model(model, active_epoch=None):
     model.eval()
     total_TI = 0
-    with tqdm(total=len(val_dataset), desc=f'Validation', unit='img') as pbar2:
+    with tqdm(total=len(val_loader), desc=f'Validation', unit='img') as pbar2:
         for i, batch in enumerate(val_loader, 1):
             imgs = batch['image'].to(device=device, dtype=torch.float32)
             true_masks = batch['mask'].to(device=device, dtype=torch.float32)
@@ -107,8 +109,8 @@ def validate_model(model, active_epoch=None):
             pbar2.set_postfix(**{'Avg Tversky index': total_TI/i})
     
     writer.add_image("input image", imgs, dataformats='NCHW', global_step=active_epoch)
-    writer.add_image("predicted mask", torch.unsqueeze(pred_mask[:, 1, :, :], 1), dataformats='NCHW', global_step=active_epoch)
-    writer.add_image("True mask", torch.unsqueeze(true_masks[:, 1, :, :], 1), dataformats='NCHW', global_step=active_epoch)
+    writer.add_image("predicted mask", pred_mask, dataformats='NCHW', global_step=active_epoch)
+    writer.add_image("True mask", torch.unsqueeze(true_masks, 1), dataformats='NCHW', global_step=active_epoch)
 
     return total_TI/len(val_dataset)
 
@@ -117,14 +119,14 @@ def sample_images(model, unlabel_set, k=10, num_iter=30):
     new_ims = []
     model.eval()
 
-    for i in tqdm(range(len(unlabel_dataset))):
+    for i in tqdm(range(len(unlabel_dataset)), desc=f'Sampling'):
         im_name = unlabel_set.im_names[i]
         preds = []
         for _ in range(num_iter):
             im = unlabel_set[i]['image']
             out = torch.squeeze(model(torch.unsqueeze(im, dim=0).to(device=device, dtype=torch.float32)))
             preds.append(torch.nn.functional.softmax(out, dim=0).detach().cpu())
-        E = get_entropies(preds, mode="RAND")
+        E = get_entropies(preds, mode="smart")
         new_ims.append((im_name, E.item()))
     
     new_ims.sort(key = lambda x: x[1], reverse=True)
@@ -133,15 +135,15 @@ def sample_images(model, unlabel_set, k=10, num_iter=30):
 
 n = 0
 while(len(unlabel_set)>0):
-    label_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=label_set)
+    label_dataset = kvasirDataset("./Kvasir-SEG/images/", "./Kvasir-SEG/masks/", color=True, 
+                            transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            classes=['polyp'], im_names=label_set)
     model = train_model(label_dataset, n)
     performance = validate_model(model, n)
     torch.save(model.state_dict(), cp_dir + str(len(label_set)/len(IMAGES)*100) + f'.pth')
-    unlabel_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=unlabel_set)
+    unlabel_dataset = kvasirDataset("./Kvasir-SEG/images/", "./Kvasir-SEG/masks/", color=True, 
+                            transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                                                        classes=['polyp'], im_names=unlabel_set)
     torch.cuda.empty_cache()
     new_ims = sample_images(model, unlabel_dataset, k=math.floor(len(IMAGES) * LABEL_PERCENT))
     for i in new_ims:

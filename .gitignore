@@ -32,3 +32,8 @@ input/*
 SimpleElastix/
 build/
 modules/
+*.npy
+vr/
+cityscapes/
+*.ply
+*.stl

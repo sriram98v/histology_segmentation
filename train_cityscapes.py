@@ -1,7 +1,7 @@
 import torch
 from BayesianSeg.models.bayes_unet import *
 from BayesianSeg.loss.losses import *
-from BayesianSeg.datasets.histology_dataset import histologyDataset
+from BayesianSeg.datasets.cityscapes_dataset import cityscapesDataset
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader, random_split
 from torch import optim
@@ -20,9 +20,10 @@ writer=SummaryWriter('content/logsdir')
 
 device = torch.device('cuda:0')
 
-dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                            transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                            classes=['AS', 'Cartilage', 'RS', 'SM'])
+dataset = cityscapesDataset('./cityscapes', split='train', mode='fine',
+                    transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                     target_type='semantic')
+
 
 n_val = int(len(dataset) * VAL_PERCENT)
 n_train = len(dataset) - n_val
@@ -53,7 +54,7 @@ for epoch in range(EPOCHS):
             pred_mask  = model(imgs)
             loss_m = criterion_m(pred_mask, true_masks)
             loss_kl = criterion_kl(model)
-            loss = loss_m + kl_weight*loss_kl
+            loss = loss_m + kl*loss_kl
             total_TI += (1 - get_TI(pred=pred_mask, true=true_masks, alpha=1, beta=1, smooth=0, gamma=1).item())
             epoch_loss += loss.item()
 
@@ -105,8 +106,8 @@ for epoch in range(EPOCHS):
                         epoch)            
     
     writer.add_image("input image", imgs, dataformats='NCHW', global_step=epoch)
-    writer.add_image("predicted mask", torch.unsqueeze(pred_mask[:, 1, :, :], 1), dataformats='NCHW', global_step=epoch)
-    writer.add_image("True mask", torch.unsqueeze(true_masks[:, 1, :, :], 1), dataformats='NCHW', global_step=epoch)
+    writer.add_image("predicted mask", pred_mask, dataformats='NCHW', global_step=epoch)
+    writer.add_image("True mask", torch.unsqueeze(true_masks, 1), dataformats='NCHW', global_step=epoch)
 
     # scheduler.step(val_loss/n_val)
     torch.save(model.state_dict(), cp_dir + f'model_ep{str(epoch)}_{str(val_loss/len(val_loader))}.pth')

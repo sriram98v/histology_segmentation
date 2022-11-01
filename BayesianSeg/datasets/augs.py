@@ -71,4 +71,13 @@ class RGB_to_HSV(object):
         im = np.moveaxis(np.ceil(sample['image']*255).astype(np.uint8), 0, -1)
         mask = sample['mask']
 
+class tuple_to_dict(object):
+    """Randomly rotate a batch by some multiple of 90 degrees"""
+    
+    def __call__(self, sample):
+
+        return {'image':np.array(sample[0]),
+                'mask':np.array(sample[1])
+                }
+
         

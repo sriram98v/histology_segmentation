@@ -8,7 +8,7 @@ from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
 from BayesianSeg.datasets.augs import *
-from BayesianSeg.metrics.metrics import get_TI
+from BayesianSeg.metrics.metrics import IoU
 
 VAL_PERCENT = 0.4
 EPOCHS = 500
@@ -19,9 +19,8 @@ cp_dir = "./checkpoints/kvasir/"
 writer=SummaryWriter('content/logsdir')
 
 device = torch.device('cuda:0')
-
 dataset = kvasirDataset("./Kvasir-SEG/images/", "./Kvasir-SEG/masks/", color=True, 
-                            transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
                             classes=['polyp'])
 
 n_val = int(len(dataset) * VAL_PERCENT)
@@ -54,7 +53,7 @@ for epoch in range(EPOCHS):
             loss_m = criterion_m(pred_mask, true_masks)
             loss_kl = criterion_kl(model)
             loss = loss_m + kl*loss_kl
-            total_TI += (1 - get_TI(pred=pred_mask, true=true_masks, alpha=1, beta=1, smooth=0, gamma=1).item())
+            total_TI += IoU(pred=pred_mask, true=true_masks).item()
             epoch_loss += loss.item()
 
             pbar.set_postfix(**{'TI (batch)': loss_m.item(), 'KL Div (batch)': loss_kl.item()})
@@ -91,7 +90,7 @@ for epoch in range(EPOCHS):
             loss_kl = criterion_kl(model)
             loss = loss_m + kl*loss_kl
             val_loss += loss.item()
-            total_TI += (1 - get_TI(pred=pred_mask, true=true_masks, alpha=1, beta=1, smooth=0, gamma=1).item())
+            total_TI += IoU(pred=pred_mask, true=true_masks).item()
 
             pbar2.set_postfix(**{'Avg Val_loss': loss.item()})
 
