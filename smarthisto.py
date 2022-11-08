@@ -12,6 +12,17 @@ import argparse
 import sys
 import json
 
+def get_args():
+    parser = argparse.ArgumentParser(description='Segments histology images in input directory',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-i', '--input-dir', type=str, help='Input Directory', dest='in_dir', default="./input/")
+    parser.add_argument('-o', '--out-dir', type=str, default="./output/", help='Output Directory', dest='out_dir')
+    parser.add_argument('-m', '--model', type=str, default="./model.pth", help='Pretrained model', dest='model')
+    parser.add_argument('-d', '--device', type=str, default='cpu', help='device', dest='device')
+    parser.add_argument('-c', '--classes', type=str, default='None', help='Classes file', dest='classes')
+
+    return parser.parse_args()
+
 def init_model(args):
     try:
         with open(args.classes, 'r') as f:
@@ -23,17 +34,6 @@ def init_model(args):
         return model
     except:
         return False
-
-def get_args():
-    parser = argparse.ArgumentParser(description='Segments histology images in input directory',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-i', '--input-dir', type=str, help='Input Directory', dest='in_dir', default="./input/")
-    parser.add_argument('-o', '--out-dir', type=str, default="./output/", help='Output Directory', dest='out_dir')
-    parser.add_argument('-m', '--model', type=str, default="./model.pth", help='Pretrained model', dest='model')
-    parser.add_argument('-d', '--device', type=str, default='cpu', help='device', dest='device')
-    parser.add_argument('-c', '--classes', type=str, default='None', help='Classes file', dest='classes')
-
-    return parser.parse_args()
 
 
 def output_im(im, window_size = 512, step_size = 256, size=(256, 256)):

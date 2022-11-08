@@ -40,8 +40,8 @@ def IoU(pred, true, smooth=1e-6):
     
 def get_TI(pred, true, alpha=0.5, beta=0.5, smooth=1, gamma=1):
     
-    pred = (pred>0.5).astype(np.uint8)
-    true = (true>0.5).astype(np.uint8)
+    pred = (pred>0.5)
+    true = (true>0.5)
     
     #True Positives, False Positives & False Negatives
     TP = torch.logical_and(pred, true).sum()    
