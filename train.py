@@ -8,7 +8,7 @@ from torch import optim
 from tqdm import tqdm
 from torchvision import transforms
 from BayesianSeg.datasets.augs import *
-from BayesianSeg.metrics.metrics import get_TI
+from BayesianSeg.metrics.metrics import get_entropies, get_TI
 import json
 import os
 import argparse
@@ -33,6 +33,24 @@ def gen_output_conf(model, path):
         json.dump(data, f)
     print("Saved classes to "+path)
 
+def sample_images(model, unlabel_set, k=10, num_iter=30):
+
+    new_ims = []
+    model.eval()
+
+    for i in tqdm(range(len(unlabel_dataset))):
+        im_name = unlabel_set.im_names[i]
+        preds = []
+        for _ in range(num_iter):
+            im = unlabel_set[i]['image']
+            out = torch.squeeze(model(torch.unsqueeze(im, dim=0).to(device=device, dtype=torch.float32)))
+            preds.append(torch.nn.functional.softmax(out, dim=0).detach().cpu())
+        E = get_entropies(preds, mode="RAND")
+        new_ims.append((im_name, E.item()))
+    
+    new_ims.sort(key = lambda x: x[1], reverse=True)
+
+    return new_ims[:k]    
 
 def train(config):    
     EPOCHS = config["epochs"]
@@ -50,7 +68,10 @@ def train(config):
 
     writer=SummaryWriter(config["log_dir"])
 
-    device = torch.device(config["device"])
+    try:
+        device = torch.device(config["device"])
+    except:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if not os.path.exists(config["log_dir"]):
         os.makedirs(config["log_dir"])

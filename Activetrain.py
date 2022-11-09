@@ -13,43 +13,88 @@ import math
 import random
 import matplotlib.pyplot as plt
 from BayesianSeg.metrics.metrics import IoU, get_entropies
+import argparse
+import json
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Segments histology images in input directory',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-c', '--config-file', type=str, help='Config File', dest='config', default="./config.json")
+    return parser.parse_args()
+
+def parse_config(config_path):
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+            return config
+    except FileNotFoundError:
+        print(config_path+" not found! Try running gen_config to generate a default config file")
+
+def gen_output_conf(model, path):
+    with open(path, 'w') as f:
+        data  = {"classes": model.classes}
+        json.dump(data, f)
+    print("Saved classes to "+path)
+
+def train(config):
+    LABEL_PERCENT = config["label_percent"]
+    EPOCHS = config["epochs"]
+    BATCH_SIZE = config["batch_size"]
+    LR = config["lr"]
+
+    IMAGES = os.listdir(os.path.join(config["dataset"]["dataset_dir"], "images"))
+    CLASSES = os.listdir(os.path.join(config["dataset"]["dataset_dir"], "GT")) if config["dataset"]["classes"]==0 else config["dataset"]["classes"]==0
+
+    random.shuffle(IMAGES)
+
+    n_train = int(len(IMAGES))
+    n_label = int(n_train * LABEL_PERCENT)
+    n_unlabel = len(IMAGES) - n_label
+
+    train_set = IMAGES[:n_train]
+    label_set = train_set[:n_label]
+    unlabel_set = train_set[n_label:]
+
+    if not os.path.exists(config["cp_dir"]):
+        os.makedirs(config["cp_dir"])
+        print("Created logs directory at "+config["cp_dir"])
+    cp_dir = config["cp_dir"]
+
+    if not os.path.exists(config["log_dir"]):
+        os.makedirs(config["log_dir"])
+        print("Created logs directory at "+config["log_dir"])
+
+    writer=SummaryWriter(config["log_dir"])
+
+    try:
+        device = torch.device(config["device"])
+    except:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    active_batch_size = int(len(IMAGES) * LABEL_PERCENT)
+
+    n = 0
+    while(len(unlabel_set)>0):
+        label_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
+                            transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=label_set)
+        model = train_model(label_dataset, n_label, n, device, LR, BATCH_SIZE, EPOCHS, writer)
+        torch.save(model.state_dict(), cp_dir + str(len(label_set)/len(IMAGES)*100) + f'.pth')
+        unlabel_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
+                            transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+                            classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=unlabel_set)
+        torch.cuda.empty_cache()
+        new_ims = sample_images(model, unlabel_dataset, device, k=math.floor(len(IMAGES) * LABEL_PERCENT))
+        for i in new_ims:
+            label_set.append(i[0])
+            unlabel_set.remove(i[0])
+
+        n+=1
 
 
-LABEL_PERCENT = 0.05
-VAL_PERCENT = 0.2
-EPOCHS = 500
-BATCH_SIZE = 8
-LR = 0.005
+    torch.save(model.state_dict(), cp_dir + f'Final_model.pth')
 
-IMAGES = os.listdir(os.path.join("./histology_dataset/30/train/", "images"))
-CLASSES = ['AS', 'Cartilage', 'RS', 'SM']
-
-random.shuffle(IMAGES)
-
-n_train = int(len(IMAGES) * (1-VAL_PERCENT))
-n_label = int(n_train * LABEL_PERCENT)
-n_unlabel = len(IMAGES) - n_label
-
-val_set = IMAGES[n_train:]
-train_set = IMAGES[:n_train]
-label_set = train_set[:n_label]
-unlabel_set = train_set[n_label:]
-
-
-val_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=val_set)
-
-val_loader = DataLoader(val_dataset, batch_size=1, shuffle=True, num_workers=8, pin_memory=True)
-
-cp_dir = "./checkpoints/"
-writer=SummaryWriter('content/logsdir')
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-active_batch_size = int(len(IMAGES) * LABEL_PERCENT)
-
-def train_model(label_set, active_epoch):
+def train_model(label_set, n_label, active_epoch, device, LR, BATCH_SIZE, EPOCHS, writer):
     model = Bayesian_UNet(3, label_set.num_classes, classes=label_set.classes)
     model.to(device=device)
     criterion_m = DiceBCELoss()
@@ -94,34 +139,15 @@ def train_model(label_set, active_epoch):
 
     return model
 
-def validate_model(model, active_epoch=None):
-    model.eval()
-    total_TI = 0
-    with tqdm(total=len(val_dataset), desc=f'Validation', unit='img') as pbar2:
-        for i, batch in enumerate(val_loader, 1):
-            imgs = batch['image'].to(device=device, dtype=torch.float32)
-            true_masks = batch['mask'].to(device=device, dtype=torch.float32)
-            pred_mask = model(imgs)
-            total_TI += IoU(pred=pred_mask, true=true_masks).item()
-
-            pbar2.set_postfix(**{'Avg Tversky index': total_TI/i})
-    
-    writer.add_image("input image", imgs, dataformats='NCHW', global_step=active_epoch)
-    writer.add_image("predicted mask", torch.unsqueeze(pred_mask[:, 1, :, :], 1), dataformats='NCHW', global_step=active_epoch)
-    writer.add_image("True mask", torch.unsqueeze(true_masks[:, 1, :, :], 1), dataformats='NCHW', global_step=active_epoch)
-
-    return total_TI/len(val_dataset)
-
-def sample_images(model, unlabel_set, k=10, num_iter=30):
-
+def sample_images(model, unlabel_dataset, device, k=10, num_iter=30):
     new_ims = []
     model.eval()
 
     for i in tqdm(range(len(unlabel_dataset))):
-        im_name = unlabel_set.im_names[i]
+        im_name = unlabel_dataset.im_names[i]
         preds = []
         for _ in range(num_iter):
-            im = unlabel_set[i]['image']
+            im = unlabel_dataset[i]['image']
             out = torch.squeeze(model(torch.unsqueeze(im, dim=0).to(device=device, dtype=torch.float32)))
             preds.append(torch.nn.functional.softmax(out, dim=0).detach().cpu())
         E = get_entropies(preds, mode="RAND")
@@ -131,30 +157,9 @@ def sample_images(model, unlabel_set, k=10, num_iter=30):
 
     return new_ims[:k]    
 
-n = 0
-while(len(unlabel_set)>0):
-    label_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=label_set)
-    model = train_model(label_dataset, n)
-    performance = validate_model(model, n)
-    torch.save(model.state_dict(), cp_dir + str(len(label_set)/len(IMAGES)*100) + f'.pth')
-    unlabel_dataset = histologyDataset("./histology_dataset/30/train/images/", "./histology_dataset/30/train/GT/", color=True, 
-                        transform=transforms.Compose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
-                        classes=['AS', 'Cartilage', 'RS', 'SM'], im_names=unlabel_set)
-    torch.cuda.empty_cache()
-    new_ims = sample_images(model, unlabel_dataset, k=math.floor(len(IMAGES) * LABEL_PERCENT))
-    for i in new_ims:
-        label_set.append(i[0])
-        unlabel_set.remove(i[0])
 
-    writer.add_scalar('Validation mIOU',
-                    performance,
-                    n)
-    n+=1
-
-
-torch.save(model.state_dict(), cp_dir + f'Final_model.pth')
-print("Done")
-
+if __name__=="__main__":
+    args = get_args()
+    config = parse_config(args.config)
+    train(config)
 
