@@ -27,6 +27,13 @@ def parse_config(config_path):
     except FileNotFoundError:
         print(config_path+" not found! Try running gen_config to generate a default config file")
 
+def gen_output_conf(model, path):
+    with open(path, 'w') as f:
+        data  = {"classes": model.classes}
+        json.dump(data, f)
+    print("Saved classes to "+path)
+
+
 def train(config):    
     EPOCHS = config["epochs"]
     BATCH_SIZE = config["batch_size"]
@@ -62,6 +69,7 @@ def train(config):
     kl_weight = 0.1
     optimizer = optim.Adam(model.parameters(), lr=LR)
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    gen_output_conf(model, config["model_config"])
 
     data = next(iter(train_loader))
     writer.add_graph(model,data['image'].to(device=device, dtype=torch.float32))

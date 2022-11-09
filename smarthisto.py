@@ -12,6 +12,15 @@ import argparse
 import sys
 import json
 
+def init_model(args):
+        with open(args.classes, 'r') as f:
+            classes = json.load(f)
+        model = Bayesian_UNet(3, 5, classes=classes["classes"])
+        device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+        model.load_state_dict(torch.load(args.model, map_location=device))
+        return model
+    
 def get_args():
     parser = argparse.ArgumentParser(description='Segments histology images in input directory',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -22,18 +31,6 @@ def get_args():
     parser.add_argument('-c', '--classes', type=str, default='None', help='Classes file', dest='classes')
 
     return parser.parse_args()
-
-def init_model(args):
-    try:
-        with open(args.classes, 'r') as f:
-            classes = json.load(f)
-        model = Bayesian_UNet(3, 5, classes=classes)
-        device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
-        model.to(device)
-        model.load_state_dict(torch.load(args.model, map_location=device))
-        return model
-    except:
-        return False
 
 
 def output_im(im, window_size = 512, step_size = 256, size=(256, 256)):
@@ -106,7 +103,6 @@ def entropy(probs):
     return -np.sum(probs*np.nan_to_num(np.log2(probs)), axis=0)
 
 def entropy_sampling(im, max_iter=20):
-    model.switch_custom_dropout(activate=True)
     out = np.zeros((model.n_classes, im.shape[0], im.shape[1]))
     
     for i in tqdm(range(max_iter)):
@@ -145,9 +141,12 @@ if __name__=="__main__":
         sys.exit("Model path incorrect")
         
     input_ims = [os.path.join(args.in_dir, i) for i in os.listdir(args.in_dir)]
-    
+
     for i in tqdm(input_ims):
         im = cv2.imread(i)
-
-        out = output_im(im)
-        make_outs(im, out, args, i)
+        try:
+            out = output_im(im)
+            make_outs(im, out, args, i)
+        except:
+            print("Failed to read image. Please verify the input path.")
+            break

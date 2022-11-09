@@ -6,6 +6,7 @@ config = {
     "lr": 0.01,
     "cp_dir": "./checkpoints/",
     "device": "cpu",
+    "model_config":"model.json",
     "model_path": "./model.pth",
     "kl_weight": 0.1,
     "log_dir": "./logs/",
