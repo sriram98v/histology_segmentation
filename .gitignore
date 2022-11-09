@@ -37,3 +37,6 @@ vr/
 cityscapes/
 *.ply
 *.stl
+Superpixel_graph.ipynb
+Dataset.ipynb
+oredict.ipynb
