@@ -36,12 +36,12 @@ class kvasirDataset(Dataset):
             img = np.expand_dims(img, axis=0)
         mask = np.array([cv2.imread(i, 0) for i in gt_names])
 
-        sample = {"image":img/255, "mask":mask/255}
+        image, target = img/255, mask
 
         if self.transform:
-            sample = self.transform(sample)
+            image, target = self.transform(image, target)
 
-        return sample
+        return image, target
     
     def append_ims(self, new_ims):
         self.im_names += new_ims

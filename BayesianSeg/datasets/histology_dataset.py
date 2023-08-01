@@ -11,9 +11,9 @@ class histologyDataset(Dataset):
         if classes:
             self.classes = classes
         else:    
-            self.classes = os.listdir(gt_dir)
+            self.classes = os.listdir(self.masks_dir)
         self.num_classes = len(self.classes)
-        self.classes.sort()
+        # self.classes.sort()
         if im_names == None:
             self.im_names = os.listdir(self.imgs_dir)
         else:
@@ -30,18 +30,19 @@ class histologyDataset(Dataset):
         
         if self.color:
             img = cv2.imread(os.path.join(self.imgs_dir, im_name))
+            # print(self.im_names)
             img = np.moveaxis(img, -1, 0)
         else:
             img = cv2.imread(os.path.join(self.imgs_dir, im_name), 0)
             img = np.expand_dims(img, axis=0)
         mask = np.array([cv2.imread(i, 0) for i in gt_names])
 
-        sample = {"image":img/255, "mask":mask/255}
+        image, target = img/255, mask
 
         if self.transform:
-            sample = self.transform(sample)
+            image, target = self.transform(image, target)
 
-        return sample
+        return image, target
     
     def append_ims(self, new_ims):
         self.im_names += new_ims

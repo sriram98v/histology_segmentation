@@ -15,7 +15,7 @@ import json
 def init_model(args):
         with open(args.classes, 'r') as f:
             classes = json.load(f)
-        model = Bayesian_UNet(3, 5, classes=classes["classes"])
+        model = Bayesian_UNet(3, len(classes["classes"]), classes=classes["classes"])
         device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
         model.to(device)
         model.load_state_dict(torch.load(args.model, map_location=device))
@@ -55,7 +55,7 @@ def output_im(im, window_size = 512, step_size = 256, size=(256, 256)):
     
     outs = nn.functional.interpolate(outs, size=(512, 512), 
                                      scale_factor=None, mode='bilinear', align_corners=True, recompute_scale_factor=None).detach().cpu().numpy()
-    out = np.zeros((5, im_h, im_w))
+    out = np.zeros((outs.shape[1], im_h, im_w))
     n = 0
     for i in range(0, im_h-window_size, 256):
         for j in range(0, im_w-window_size, 256):

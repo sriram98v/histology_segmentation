@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from collections import namedtuple
 from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 import os
-import cv2
 from PIL import Image
 import json
 
