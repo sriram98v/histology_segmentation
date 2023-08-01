@@ -65,3 +65,7 @@ For example:
 ```bash
 python predict.py -m ./Final_model.pth -i test_images/ -d cuda -c model_config.json
 ```
+
+## Thanks to
+* @kumar-shridhar [github:PyTorch-BayesianCNN](https://github.com/kumar-shridhar/PyTorch-BayesianCNN)
+* @Harry-24k [github: bayesian-neural-network-pytorch](https://github.com/Harry24k/bayesian-neural-network-pytorch)
