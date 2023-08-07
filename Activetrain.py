@@ -51,7 +51,6 @@ def train(config):
     PRIOR_SIGMA = config["model"]["prior_sigma"]
 
     IMAGES = os.listdir(os.path.join(TRAIN_PATH, "images"))
-    CLASSES = os.listdir(os.path.join(TRAIN_PATH, "GT")) if config["dataset"]["classes"]==0 else config["dataset"]["classes"]==0
     BILINEAR = config["model"]["bilinear"]
     
     LOSS = config["loss"]["name"]
@@ -79,13 +78,8 @@ def train(config):
     unlabel_set = train_set[n_label:]
 
     val_set = histologyDataset(os.path.join(VAL_PATH, "images"), os.path.join(VAL_PATH, "GT"),
-                            color=True, transform=BSCompose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]))
+                            color=True, transform=BSCompose([Rotate(), ToTensor(), Resize(size=(256, 256))]))
     val_loader = DataLoader(val_set, batch_size=TEST_BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True)
-
-    if not os.path.exists(config["cp_dir"]):
-        os.makedirs(config["cp_dir"])
-        print("Created logs directory at "+config["cp_dir"])
-    cp_dir = config["cp_dir"]
 
     if not os.path.exists(config["log_dir"]):
         os.makedirs(config["log_dir"])
@@ -106,7 +100,7 @@ def train(config):
                             color=True, transform=BSCompose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
                             im_names=label_set)
         print("Training model")
-        model = train_model(PRIOR_MU, PRIOR_SIGMA, label_dataset, device, LR, TRAIN_BATCH_SIZE, EPOCHS, KL_WEIGHT, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS)
+        model = train_model(PRIOR_MU, PRIOR_SIGMA, label_dataset, device, LR, TRAIN_BATCH_SIZE, EPOCHS, KL_WEIGHT, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR)
         print("Validating model")
         mIoU = evaluate(model, val_loader, device=device, metric=criterion_acc)
 
@@ -128,8 +122,8 @@ def train(config):
 
 
 
-def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS, KL_weight, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS):
-    model = Bayesian_UNet(PRIOR_MU, PRIOR_SIGMA, 3, label_set.num_classes, classes=label_set.classes)
+def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS, KL_weight, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR):
+    model = Bayesian_UNet(PRIOR_MU, PRIOR_SIGMA, 3, label_set.num_classes, classes=label_set.classes, bilinear=BILINEAR)
     model.to(device=device)
     criterion_m = Loss(LOSS, device, **LOSS_KWARGS)
     criterion_kl = Loss(LOSS_KL, device, **LOSS_KL_KWARGS)
@@ -165,6 +159,7 @@ def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS
         TIs.append(total_TI/len(train_loader))
     
     return model
+
 
 def sample_images(model, unlabel_dataset, device, alpha, sampler, k=10, num_iter=10):
     new_ims = []

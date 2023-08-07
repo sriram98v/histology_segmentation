@@ -3,44 +3,89 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torchvision.transforms.functional as F
 import random
 from BayesianSeg.misc import *
 
+class PIL_to_tensor(object):
+    def __call__(self, img, target):
+        """Convert a ``PIL Image`` to a tensor of the same type.
+        This function does not support torchscript.
+    
+        See :class:`~torchvision.transforms.PILToTensor` for more details.
+    
+        .. note::
+    
+            A deep copy of the underlying array is performed.
+    
+        Args:
+            pic (PIL Image): Image to be converted to tensor.
+    
+        Returns:
+            Tensor: Converted image.
+        """
+        # handle PIL Image
+        img = torch.as_tensor(np.array(img, copy=True))
+        # put it from HWC to CHW format
+        img = img.permute((2, 0, 1))
 
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, image, target):
-
-        return torch.from_numpy(image.copy()).type(torch.FloatTensor), torch.from_numpy(target.copy()).type(torch.FloatTensor)
+        
+        return img, torch.as_tensor(np.array(target, copy=True))
 
 class Resize(object):
-    """Convert ndarrays in sample to Tensors."""
+    """Resize tensor"""
 
-    def __init__(self, size=None, scale_factor=None, mode='bilinear', align_corners=True, recompute_scale_factor=None):
+    def __init__(self, size=None, max_size=None, antialias=True, interpolation=F.InterpolationMode.NEAREST):
         self.size = size
-        self.scale_factor = scale_factor
-        self.mode = mode
-        self.align_corners = align_corners
-        self.recompute_scale_factor = recompute_scale_factor
+        self.max_size = max_size
+        self.antialias = antialias
+        self.interpolation = interpolation
 
     def __call__(self, image, target):
-        image, mask = torch.unsqueeze(image, 0), torch.unsqueeze(target, 0)
+        target = torch.unsqueeze(torch.unsqueeze(target, dim=0), dim=0)
 
-        return torch.squeeze(nn.functional.interpolate(image, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners, recompute_scale_factor=self.recompute_scale_factor)), (torch.squeeze(nn.functional.interpolate(mask, size=self.size, scale_factor=self.scale_factor, mode=self.mode, align_corners=self.align_corners, recompute_scale_factor=self.recompute_scale_factor))>0.5).to(torch.int)
-            
+        return F.resize(image, self.size, self.interpolation, self.max_size, self.antialias), torch.squeeze(F.resize(target, self.size, self.interpolation, self.max_size, self.antialias))
 
 class Rotate(object):
     """Randomly rotate a batch by some multiple of 90 degrees"""
+
+    def __init__(self, degree, interpolation=F.InterpolationMode.NEAREST, expand=False, center=None, fill=0):
+
+        self.degree = degree
+
+        self.center = center
+
+        self.interpolation = interpolation
+        self.expand = expand
+
+        self.fill = fill
+
+    @staticmethod
+    def get_params(degree):
+        """Get parameters for ``rotate`` for a random rotation.
+
+        Returns:
+            float: angle parameter to be passed to ``rotate`` for random rotation.
+        """
+        angle = float(torch.empty(1).uniform_(-float(degree), float(degree)).item())
+        return angle
     
     def __call__(self, image, target):
+        """
+        Args:
+            img (PIL Image or Tensor): Image to be rotated.
 
-        im = image
-        mask = target
+        Returns:
+            PIL Image or Tensor: Rotated image.
+        """
+        fill = self.fill
+        channels_im, _, _ = F.get_dimensions(image)
+        channels_tar, _, _ = F.get_dimensions(target)
+        fill_im = [float(fill)] * channels_im
+        fill_target = [float(0)] * channels_tar
+        angle = self.get_params(self.degree)
 
-        deg = random.choice([0, 1, 2, 3])
-        
-        return np.rot90(im,k=deg, axes=(1, 2)), np.rot90(mask,k=deg, axes=(1, 2))
+        return F.rotate(image, angle, self.interpolation, self.expand, self.center, fill_im), F.rotate(target, angle, self.interpolation, self.expand, self.center, fill_target)
 
         
 class Brightness(object):
@@ -55,14 +100,6 @@ class Brightness(object):
         deg = random.choice(list(range(0, self.max_brightness, 10)))
         
         return np.moveaxis(increase_brightness(im, value=deg), -1, 0)/255, target
-
-    
-class to_np(object):
-    """Converts PIL to np array"""
-    
-    def __call__(self, image, target):
-
-        return np.array(image), np.array(target)
     
 class BSCompose(object):
     def __init__(self, transforms):
@@ -78,22 +115,22 @@ class class_to_channel(object):
         self.num_classes = num_classes
 
     def __call__(self, image, target):
-        new_target = np.zeros((self.num_classes, target.shape[0], target.shape[1]))
+        new_target = torch.zeros((self.num_classes, target.shape[0], target.shape[1]))
 
         for i in range(1, self.num_classes):
             new_target[i] = (target==i)
 
         return image, new_target
     
-class reorder_im_shape(object):
-    def __call__(self, image, target):
-        img = np.zeros((image.shape[2], image.shape[0], image.shape[1]))
-
-        for i in range(image.shape[2]):
-            img[i] = image[:, :, i]
-
-        return img, target
-    
 class norm_im(object):
     def __call__(self, image, target):
         return image/255, target
+    
+class gauss_noise(object):
+    def __init__(self, mu, sigma, prob=0.5):
+        self.mu = mu
+        self.sigma = sigma
+        self.prob = prob
+
+    def __call__(self, image, target):
+        return image + torch.empty_like(image).normal_(self.mu, self.sigma), target

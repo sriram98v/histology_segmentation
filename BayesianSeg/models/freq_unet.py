@@ -62,11 +62,19 @@ class Up(nn.Module):
 
 
 class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, out="sigmoid"):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        self.out = nn.Sigmoid()
-
+        match out:
+            case "sigmoid":
+                self.out = nn.Sigmoid()
+            case "softmax":
+                self.out = nn.Softmax(dim=1)
+            case "raw":
+                self.out = nn.Identity()
+            case _:
+                raise ValueError("Attribute ``out`` must be 'raw', 'sigmoid' or 'softmax'.")
+            
     def forward(self, x):
         return self.out(self.conv(x))
 
@@ -75,7 +83,7 @@ class Frequentist_UNet(nn.Module):
     def __str__(self):
         return "Frequentist_UNet"
 
-    def __init__(self, n_channels, n_classes, bilinear=True, classes=None):
+    def __init__(self, n_channels, n_classes, bilinear=True, classes=None, out_layer="sigmoid"):
         super(Frequentist_UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
@@ -90,7 +98,7 @@ class Frequentist_UNet(nn.Module):
         self.up1 = Up(512, 256 // factor, bilinear)
         self.up2 = Up(256, 128 // factor, bilinear)
         self.up3 = Up(128, 64, bilinear)
-        self.outc = OutConv(64, n_classes)
+        self.outc = OutConv(64, n_classes, out=out_layer)
 
     def forward(self, x):
         x1 = self.inc(x)

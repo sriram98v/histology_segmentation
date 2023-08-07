@@ -8,8 +8,6 @@ from torch.utils.data import DataLoader
 from BayesianSeg.datasets.augs import *
 from utils import get_args, parse_config
 
-
-@torch.inference_mode(mode=True)
 def evaluate(model, dataloader, device, metric):
     num_batches = len(dataloader)
     total_score = 0
@@ -56,7 +54,7 @@ if __name__=="__main__":
     kwargs = {'num_workers': config["dataset"]["num_workers"], 'pin_memory': True} if 'cuda' in DEVICE.type  else {'num_workers': config["dataset"]["num_workers"], 'pin_memory': False}
     
     test_set = histologyDataset(os.path.join(TEST_PATH, "images"), os.path.join(TEST_PATH, "GT"),
-                            color=True, transform=BSCompose([ToTensor(), Resize(size=(256, 256))]))
+                            color=True, transform=BSCompose([Resize(size=(256, 256)), norm_im()]))
 
     test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, shuffle=True, **kwargs)
 
