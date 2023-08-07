@@ -31,7 +31,6 @@ input/*
 3dslices
 SimpleElastix/
 build/
-modules/
 *.npy
 vr/
 cityscapes/
