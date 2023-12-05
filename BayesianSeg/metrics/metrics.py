@@ -58,26 +58,18 @@ class TI:
 class Uncertainty:
     @staticmethod
     def aleatoric(preds):
-        return torch.mean(torch.sum(preds*torch.nan_to_num(torch.log(preds)), dim=1)).item()
+        alea = (preds*(1-preds)).mean(dim=0).mean(dim=0)
+        return -alea.mean().item()
 
     @staticmethod
     def epistemic(preds):
-        p_t = torch.flatten(preds, start_dim=-3, end_dim=-1)
-        p_bar = torch.mean(p_t, dim=0)
-        div = max([torch.matmul((p_t[i]-p_bar), (p_t[i]-p_bar).T).item() for i in range(p_t.shape[0])])
-
-        return div/len(preds)
+        # epistemic = preds.softmax(dim=1).mean(dim=0)
+        return (preds*preds.log()).sum(dim=0).mean().item()
 
     @staticmethod
     def div(preds):
-        I = math.prod(preds[0].shape[:2])
-        x = 0
-        count = 0
-        for i in range(len(preds)):
-            for j in range(i, len(preds)):
-                x += preds[i]*torch.log(preds[i]/preds[j])
-                count += 1
-        return (1/(I*count))*(torch.max(torch.nan_to_num(x), dim=0)[0])
+        preds = torch.flatten(preds, start_dim=-2, end_dim=-1).mean(dim=0).var(dim=1).mean().item()
+        return preds
 
     @staticmethod
     def ent(preds):
@@ -90,7 +82,7 @@ class Uncertainty:
         return torch.max(F.softmax(preds), dim=0).item()
 
     @staticmethod
-    def rand(preds):
+    def rand():
         return torch.rand(1)[0].item()
 
 

@@ -2,7 +2,7 @@ import torch
 from BayesianSeg.loss import Loss
 from BayesianSeg.metrics import Metric, Sampler
 from evaluate import evaluate
-from BayesianSeg.datasets.histology_dataset import histologyDataset
+from BayesianSeg.datasets import *
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from BayesianSeg.models.bayes_unet import *
@@ -43,12 +43,14 @@ def train(config):
     TEST_BATCH_SIZE = config["dataset"]["test_batch_size"]
     LR = config["lr"]
     ALPHA = config["alpha"]
-    TRAIN_PATH = os.path.join(config["dataset"]["dataset_dir"], "train")
-    VAL_PATH = os.path.join(config["dataset"]["dataset_dir"], "test")
+    DS_NAME = config["dataset"]["name"]
+    ROOT_DIR = config["dataset"]["root_dir"]
+    TRAIN_PATH = os.path.join(config["dataset"]["root_dir"], "train")
     SAMPLING_METHOD = config["sampling_method"]
     KL_WEIGHT = config["kl_weight"]
     PRIOR_MU = config["model"]["prior_mu"]
     PRIOR_SIGMA = config["model"]["prior_sigma"]
+    OUT_LAYER = config["model"]["out_layer"]
 
     IMAGES = os.listdir(os.path.join(TRAIN_PATH, "images"))
     BILINEAR = config["model"]["bilinear"]
@@ -63,22 +65,19 @@ def train(config):
 
     SAMPLER = Sampler(SAMPLING_METHOD)
 
-    TRAIN_PATH = os.path.join(config["dataset"]["dataset_dir"], "train")
-
     criterion_acc = Metric(EVAL_METRIC, **EVAL_KWARGS)
 
     random.shuffle(IMAGES)
 
     n_train = int(len(IMAGES))
-    n_label = int(n_train * LABEL_PERCENT)
-    n_unlabel = len(IMAGES) - n_label
+    n_label = int(n_train * LABEL_PERCENT*2)
 
-    train_set = IMAGES[:n_train]
+    train_set = IMAGES
     label_set = train_set[:n_label]
     unlabel_set = train_set[n_label:]
 
-    val_set = histologyDataset(os.path.join(VAL_PATH, "images"), os.path.join(VAL_PATH, "GT"),
-                            color=True, transform=BSCompose([Rotate(), ToTensor(), Resize(size=(256, 256))]))
+    val_set = DS(name=DS_NAME, root_dir=ROOT_DIR, split="val", transforms=[Resize(size=(256, 256))])
+    
     val_loader = DataLoader(val_set, batch_size=TEST_BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True)
 
     if not os.path.exists(config["log_dir"]):
@@ -92,20 +91,25 @@ def train(config):
     except:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    model = Bayesian_UNet(PRIOR_MU, PRIOR_SIGMA, 3, len(val_set.classes), classes=val_set.classes, bilinear=BILINEAR, out_layer=OUT_LAYER, crf_out=False)
+    torch.save(model.state_dict(), "checkpoints/model_init.pth")
+    model.to(device)
 
-    n = 0
+    mIoUs = []
+
+    n = 1
     while(len(unlabel_set)>0):
-        print(f"Active iter: {n}")
-        label_dataset = histologyDataset(os.path.join(TRAIN_PATH, "images"), os.path.join(TRAIN_PATH, "GT"),
-                            color=True, transform=BSCompose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+        print(f"Active iter: {n}, training_sample_size: {(len(label_set)/(len(label_set)+len(unlabel_set)))*100:.2f}%")
+        label_dataset = DS(name=DS_NAME, root_dir=ROOT_DIR, split="train",
+                            color=True, transforms=[Resize(size=(256, 256)), Rotate(180, fill=1)],
                             im_names=label_set)
-        print("Training model")
-        model = train_model(PRIOR_MU, PRIOR_SIGMA, label_dataset, device, LR, TRAIN_BATCH_SIZE, EPOCHS, KL_WEIGHT, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR)
+        print(f"Training model")
+        model = train_model(PRIOR_MU, PRIOR_SIGMA, label_dataset, device, LR, TRAIN_BATCH_SIZE, EPOCHS, KL_WEIGHT, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR, OUT_LAYER, writer, n)
         print("Validating model")
-        mIoU = evaluate(model, val_loader, device=device, metric=criterion_acc)
+        mIoUs.append(evaluate(model, val_loader, device=device, metric=criterion_acc, writer=writer, step=n))
 
-        unlabel_dataset = histologyDataset(os.path.join(TRAIN_PATH, "images"), os.path.join(TRAIN_PATH, "GT"),
-                            color=True, transform=BSCompose([Brightness(100), Rotate(), ToTensor(), Resize(size=(256, 256))]),
+        unlabel_dataset = DS(name=DS_NAME, root_dir=ROOT_DIR, split="train",
+                            color=True, transforms=[Resize(size=(256, 256)), Rotate(180, fill=1)],
                             im_names=unlabel_set)
         torch.cuda.empty_cache()
         print("Sampling images")
@@ -115,25 +119,26 @@ def train(config):
             unlabel_set.remove(i[0])
 
         writer.add_scalar(f"mIoU_alpha_{ALPHA}_{SAMPLING_METHOD}_kl_weight_{KL_WEIGHT}_priorm_{PRIOR_MU}_priors_{PRIOR_SIGMA}",
-                            mIoU,
-                            n)
-
+                            max(mIoUs),
+                            (len(label_set)/(len(label_set)+len(unlabel_set)))*100)
+        
         n+=1
 
 
 
-def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS, KL_weight, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR):
-    model = Bayesian_UNet(PRIOR_MU, PRIOR_SIGMA, 3, label_set.num_classes, classes=label_set.classes, bilinear=BILINEAR)
+def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS, KL_weight, LOSS, LOSS_KL, LOSS_KWARGS, LOSS_KL_KWARGS, EVAL_METRIC, EVAL_KWARGS, BILINEAR, OUT_LAYER, writer=None, step=0):
+    model = Bayesian_UNet(PRIOR_MU, PRIOR_SIGMA, 3, len(label_set.classes), classes=label_set.classes, bilinear=BILINEAR, out_layer=OUT_LAYER, crf_out=False)
     model.to(device=device)
-    criterion_m = Loss(LOSS, device, **LOSS_KWARGS)
-    criterion_kl = Loss(LOSS_KL, device, **LOSS_KL_KWARGS)
+    model.load_state_dict(torch.load("checkpoints/model_init.pth"))
+    criterion_m = Loss(LOSS, **LOSS_KWARGS)
+    criterion_kl = Loss(LOSS_KL, **LOSS_KL_KWARGS)
     criterion_acc = Metric(EVAL_METRIC, **EVAL_KWARGS)
     kl_weight = KL_weight
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
 
     train_loader = DataLoader(label_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True)
 
-    model.train()
+    model.train_backbone()
     TIs = []
     for epoch in tqdm(range(EPOCHS)):
         epoch_loss = 0
@@ -151,29 +156,32 @@ def train_model(PRIOR_MU, PRIOR_SIGMA, label_set, device, LR, BATCH_SIZE, EPOCHS
             epoch_loss += loss.item()
             kl += loss_kl
 
-
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
         TIs.append(total_TI/len(train_loader))
+
+    if isinstance(writer, SummaryWriter):
+        writer.add_images("Training Input", imgs, step)
+        writer.add_images("Training GT", true_masks, step)
+        writer.add_images("Training Prediction", pred_mask, step)
     
     return model
 
 
-def sample_images(model, unlabel_dataset, device, alpha, sampler, k=10, num_iter=10):
+@torch.no_grad()
+def sample_images(model, unlabel_dataset, device, alpha, sampler, k=8):
     new_ims = []
     model.eval()
 
     for i in tqdm(range(len(unlabel_dataset))):
         im_name = unlabel_dataset.im_names[i]
-        preds = []
-        for _ in range(num_iter):
-            im = unlabel_dataset[i][0]
-            out = torch.squeeze(model(torch.unsqueeze(im, dim=0).to(device=device, dtype=torch.float32)))
-            preds.append(torch.nn.functional.softmax(out, dim=0).detach())
-        E = sampler(torch.flatten(torch.stack(preds), start_dim=-3, end_dim=-1), alpha=alpha)
+        preds = model(unlabel_dataset[i][0].repeat(k, 1, 1, 1).to(device=device, dtype=torch.float32)).detach()
+        E = sampler(preds, alpha=alpha)
+        # print(E)
         new_ims.append((im_name, E))
+    
     
     new_ims.sort(key = lambda x: x[1], reverse=True)
 
@@ -181,8 +189,11 @@ def sample_images(model, unlabel_dataset, device, alpha, sampler, k=10, num_iter
 
 
 if __name__=="__main__":
+    random.seed(10)
+    torch.manual_seed(0)
     args = get_args()
     config = parse_config(args.config)
+    print(config["sampling_method"])
     train(config)
     print("Done")
 

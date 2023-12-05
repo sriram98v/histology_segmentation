@@ -332,7 +332,7 @@ class BKLLoss(nn.Module):
         last_layer_only (Bool): True for return only the last layer's KL divergence.    
     """
 
-    def __init__(self, device, reduction='mean', last_layer_only=False):
+    def __init__(self, reduction='mean', last_layer_only=False, device="cpu"):
         super(BKLLoss, self).__init__()
         self.last_layer_only = last_layer_only
         self.device = torch.device(device)
@@ -366,9 +366,10 @@ class BKLLoss(nn.Module):
         Arguments:
             model (nn.Module): a model to be calculated for KL-divergence.
         """
-        kl = torch.Tensor([0]).to(self.device)
-        kl_sum = torch.Tensor([0]).to(self.device)
-        n = torch.Tensor([0]).to(self.device)
+        device = self.device
+        kl = torch.Tensor([0]).to(device=device)
+        kl_sum = torch.Tensor([0]).to(device=device)
+        n = torch.Tensor([0]).to(device=device)
 
         for m in model.modules() :
             if isinstance(m, modules.conv.BayesConv2d):

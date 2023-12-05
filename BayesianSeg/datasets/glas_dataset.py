@@ -6,17 +6,14 @@ import torchvision.transforms.functional as F
 from typing import Callable, Optional, List
 import os
 
-class histologyDataset(VisionDataset):
-    histologyClass = namedtuple(
-        "histology_class",
+class GlaSDataset(VisionDataset):
+    GlaSClass = namedtuple(
+        "GlaS_class",
         ["name", "id", "color"],
     )
     classes = [
-        histologyClass("Alveolar_Septa", 0, (111, 74, 0)),
-        histologyClass("Cartilage", 1, (81, 0, 81)),
-        histologyClass("Red_Blood_Cells", 2, (128, 64, 128)),
-        histologyClass("Respiratory_Epithelium", 3, (244, 35, 232)),
-        histologyClass("Smooth_Muscle", 4, (250, 170, 160)),
+        GlaSClass("not_gland", 0, (111, 74, 0)),
+        GlaSClass("Gland", 1, (81, 0, 81)),
     ]
     def __init__(self, root: str, 
                 split: str = "train",
@@ -48,13 +45,13 @@ class histologyDataset(VisionDataset):
 
     def __getitem__(self, idx):
         im_name = self.im_names[idx]
-        gt_names = [os.path.join(self.masks_dir, gt_class, im_name) for gt_class in self.classes]
+        gt_names = [os.path.join(self.masks_dir, gt_class, im_name[:-4]+"_anno.bmp") for gt_class in self.classes]
         
         if self.color:
             image = F.pil_to_tensor(Image.open(os.path.join(self.imgs_dir, im_name)).convert("RGB"))/255
         else:
             image = F.pil_to_tensor(Image.open(im_name).convert("L"))
-        target = torch.squeeze(torch.stack([F.pil_to_tensor(Image.open(i).convert("L")) for i in gt_names]))/255
+        target = torch.vstack([(F.pil_to_tensor(Image.open(i).convert("L"))>0).to(dtype=torch.float32) for i in gt_names])
         
         if self.transforms is not None:
             image, target = self.transforms(image, target)

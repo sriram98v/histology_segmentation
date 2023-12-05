@@ -42,9 +42,9 @@ class Resize(object):
         self.interpolation = interpolation
 
     def __call__(self, image, target):
-        target = torch.unsqueeze(torch.unsqueeze(target, dim=0), dim=0)
+        # target = torch.unsqueeze(torch.unsqueeze(target, dim=0), dim=0)
 
-        return F.resize(image, self.size, self.interpolation, self.max_size, self.antialias), torch.squeeze(F.resize(target, self.size, self.interpolation, self.max_size, self.antialias))
+        return F.resize(image, self.size, self.interpolation, self.max_size, self.antialias), F.resize(target, self.size, self.interpolation, self.max_size, self.antialias)
 
 class Rotate(object):
     """Randomly rotate a batch by some multiple of 90 degrees"""

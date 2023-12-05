@@ -1,6 +1,6 @@
 from .losses import *
 
-def Loss(method, device, **kwargs):
+def Loss(method, **kwargs):
     match method:
         case "DiceLoss":
             return DiceLoss(kwargs["weight"], kwargs["size_average"])
@@ -29,6 +29,6 @@ def Loss(method, device, **kwargs):
         case "ELBO_FocalLogTverskyLoss":
             return ELBO_FocalLogTverskyLoss(kwargs["alpha"], kwargs["beta"], kwargs["smooth"], kwargs["gamma"])
         case "BKLLoss":
-            return BKLLoss(device, kwargs["reduction"], kwargs["last_layer_only"])
+            return BKLLoss(kwargs["reduction"], kwargs["last_layer_only"], kwargs["device"])
         case _:
             raise NameError(f'Loss {method} not found')

@@ -7,10 +7,14 @@ from BayesianSeg.datasets.histology_dataset import histologyDataset
 from torch.utils.data import DataLoader
 from BayesianSeg.datasets.augs import *
 from utils import get_args, parse_config
+from torch.utils.tensorboard import SummaryWriter
 
-def evaluate(model, dataloader, device, metric):
+
+@torch.no_grad()
+def evaluate(model, dataloader, device, metric, writer=None, step=0):
     num_batches = len(dataloader)
     total_score = 0
+    num_iter = 0
 
     # iterate over the validation set
     with tqdm(total=len(dataloader), desc=f'Testing') as pbar:
@@ -25,6 +29,12 @@ def evaluate(model, dataloader, device, metric):
 
             pbar.update()
             pbar.set_postfix(**{f"{metric}": score})
+            num_iter += 1
+
+    if isinstance(writer, SummaryWriter):
+        writer.add_images("Validation Input", imgs, step)
+        writer.add_images("Validation GT", true_masks, step)
+        writer.add_images("Validation Prediction", pred_mask, step)
 
     return total_score / max(num_batches, 1)
 
