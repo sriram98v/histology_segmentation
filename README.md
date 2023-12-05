@@ -1,4 +1,5 @@
 # SmartHisto #
+![alt text](proj_im.png)
 SmartHisto is a Deep Bayesian Neural Network Framework that can be used to
 - Train a bayesian model on annotated histopathology images.
 - Identify structures on histopathology slices.
