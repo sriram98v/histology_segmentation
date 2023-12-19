@@ -8,6 +8,9 @@ SmartHisto is a Deep Bayesian Neural Network Framework that can be used to
 ## Usage ##
 You can clone this repository and run the scripts below.
 
+### Prerequisite ###
+You will need to install the torchbnn package from the git branch [https://github.com/sriram98v/bayesian-neural-network-pytorch](url). See the README for instructions.
+
 ## Training a new model ##
 This section describes how to train a new model 
 
