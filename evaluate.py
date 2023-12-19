@@ -6,35 +6,48 @@ from BayesianSeg.metrics import Metric
 from BayesianSeg.datasets.histology_dataset import histologyDataset
 from torch.utils.data import DataLoader
 from BayesianSeg.datasets.augs import *
+from BayesianSeg.misc import *
 from utils import get_args, parse_config
 from torch.utils.tensorboard import SummaryWriter
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device, metric, writer=None, step=0):
+def evaluate(model, dataloader, device, metric, crf_out_layer=None, writer=None, step=0, log_str=""):
     num_batches = len(dataloader)
     total_score = 0
+    total_score_crf = 0
     num_iter = 0
 
     # iterate over the validation set
     with tqdm(total=len(dataloader), desc=f'Testing') as pbar:
         model.eval()
-        for batch in dataloader:
+        for n,batch in enumerate(dataloader):
             imgs = batch[0].to(device=device, dtype=torch.float32)
             true_masks = batch[1].to(device=device, dtype=torch.float32)
-            pred_mask  = model(imgs)
+            pred_logits  = model(imgs)
+            if isinstance(crf_out_layer, nn.Module):
+                pred_logits_crf = crf_out_layer(pred_logits, imgs)
+                score = metric(pred=normalize(pred_logits), true=true_masks).item()            
+                total_score += score
+                score_crf = metric(pred=normalize(pred_logits_crf), true=true_masks).item()
+                total_score_crf += score_crf
+                pbar.update()
+                pbar.set_postfix(**{f"{metric}": total_score/(n+1),
+                                    f"{metric}_crf": total_score_crf/(n+1)})
+            else:
+                score = metric(pred=normalize(pred_logits), true=true_masks).item()            
+                total_score += score
+                pbar.update()
+                pbar.set_postfix(**{f"{metric}": total_score/(n+1)})
 
-            score = metric(pred=pred_mask, true=true_masks).item()
-            total_score += score
-
-            pbar.update()
-            pbar.set_postfix(**{f"{metric}": score})
             num_iter += 1
 
     if isinstance(writer, SummaryWriter):
-        writer.add_images("Validation Input", imgs, step)
-        writer.add_images("Validation GT", true_masks, step)
-        writer.add_images("Validation Prediction", pred_mask, step)
+        writer.add_images(f"{log_str}_Validation Input", imgs, step)
+        writer.add_images(f"{log_str}_Validation GT", true_masks, step)
+        writer.add_images(f"{log_str}_Validation Prediction", normalize(pred_logits), step)
+        if isinstance(crf_out_layer, nn.Module):
+            writer.add_images(f"{log_str}_Validation Prediction CRF", normalize(pred_logits_crf), step)
 
     return total_score / max(num_batches, 1)
 
@@ -72,6 +85,6 @@ if __name__=="__main__":
     model.to(device=DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
 
-    accuracy = evaluate(model=model, dataloader=test_loader, device=DEVICE, metric=Metric(EVAL_METRIC, **EVAL_KWARGS))
+    accuracy = evaluate(model=model, dataloader=test_loader, device=DEVICE, metric=Metric(EVAL_METRIC, **EVAL_KWARGS), log_str="")
 
     print(f"Accuracy: {accuracy}")

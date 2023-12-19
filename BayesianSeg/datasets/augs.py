@@ -127,10 +127,21 @@ class norm_im(object):
         return image/255, target
     
 class gauss_noise(object):
-    def __init__(self, mu, sigma, prob=0.5):
-        self.mu = mu
+    def __init__(self, kernel_size=3, sigma=(0.1, 2.0)):
+        self.kernel_size = (kernel_size, kernel_size)
         self.sigma = sigma
-        self.prob = prob
 
-    def __call__(self, image, target):
-        return image + torch.empty_like(image).normal_(self.mu, self.sigma), target
+    @staticmethod
+    def get_params(sigma_min: float, sigma_max: float) -> float:
+        return torch.empty(1).uniform_(sigma_min, sigma_max).item()
+
+    def __call__(self, img, target):
+        """
+        Args:
+            img (PIL Image or Tensor): image to be blurred.
+
+        Returns:
+            PIL Image or Tensor: Gaussian blurred image
+        """
+        sigma = self.get_params(self.sigma[0], self.sigma[1])
+        return F.gaussian_blur(img, self.kernel_size, [sigma, sigma]), target

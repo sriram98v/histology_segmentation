@@ -1,4 +1,5 @@
 from .losses import *
+from torchbnn import nn as bnn
 
 def Loss(method, **kwargs):
     match method:
@@ -6,6 +7,8 @@ def Loss(method, **kwargs):
             return DiceLoss(kwargs["weight"], kwargs["size_average"])
         case "DiceBCELoss":
             return DiceBCELoss(kwargs["reduction"])
+        case "DiceBCEWithLogitsLoss":
+            return DiceBCEWithLogitsLoss(kwargs["reduction"])
         case "CELoss":
             return CELoss(kwargs["reduction"])
         case "IoULoss":
@@ -29,6 +32,6 @@ def Loss(method, **kwargs):
         case "ELBO_FocalLogTverskyLoss":
             return ELBO_FocalLogTverskyLoss(kwargs["alpha"], kwargs["beta"], kwargs["smooth"], kwargs["gamma"])
         case "BKLLoss":
-            return BKLLoss(kwargs["reduction"], kwargs["last_layer_only"], kwargs["device"])
+            return bnn.BKLLoss(kwargs["reduction"], kwargs["last_layer_only"])
         case _:
             raise NameError(f'Loss {method} not found')

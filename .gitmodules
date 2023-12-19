@@ -1,0 +1,3 @@
+[submodule "BayesianSeg/bayesian-neural-network-pytorch"]
+	path = BayesianSeg/bayesian-neural-network-pytorch
+	url = https://github.com/sriram98v/bayesian-neural-network-pytorch

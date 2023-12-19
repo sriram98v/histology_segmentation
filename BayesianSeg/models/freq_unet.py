@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+import torchbnn.nn as bnn
 
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, mid_channels=None):
@@ -65,21 +66,12 @@ class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels, out="sigmoid"):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        match out:
-            case "sigmoid":
-                self.out = nn.Sigmoid()
-            case "softmax":
-                self.out = nn.Softmax(dim=1)
-            case "raw":
-                self.out = nn.Identity()
-            case _:
-                raise ValueError("Attribute ``out`` must be 'raw', 'sigmoid' or 'softmax'.")
-            
+
     def forward(self, x):
-        return self.out(self.conv(x))
+        return self.conv(x)
 
 
-class Frequentist_UNet(nn.Module):
+class Frequentist_UNet(bnn.BayesModule):
     def __str__(self):
         return "Frequentist_UNet"
 

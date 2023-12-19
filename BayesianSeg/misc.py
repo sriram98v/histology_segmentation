@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+
+cm = plt.get_cmap('jet')
 
 def increase_brightness(img, value=30):
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -30,8 +33,13 @@ def highlight_im(im, mask, threshold=0.5):
     return cv2.merge((b,g,r), im)
 
 def entropy(probs):
-#     log_prob = np.log(out)
     return probs*np.nan_to_num(np.log2(probs))*-1
 
+def grayscale_to_heatmap(image):
+    return cm(image)[:, :, :-1]
 
-
+def normalize(output):
+    if output.shape[1]==1:
+        return output.sigmoid()
+    else:
+        return output.softmax(dim=1)

@@ -174,27 +174,39 @@ class MessagePassing(nn.Module):
         return Qtilde
 
 
-class CRF(nn.Module):
+class CRFLayer(nn.Module):
     """ Break meanfields down as CNN and do iteration """
     def __init__(self, n_iter, in_channels, n_classes, kernel_size=[3, 3], theta_alpha=[1.5, 2.5], 
                  theta_beta=[1.5, 2.5], theta_gamma=[1.5,], returns="logits"):
-        super(CRF, self).__init__()
+        super(CRFLayer, self).__init__()
         self.n_iter = n_iter
         self.n_classes = n_classes
         n_filters = in_channels * len(theta_alpha) + len(theta_gamma)
 
-        if returns in ['logits', 'sigmoid', 'log-sigmoid']:
+        if returns in ['logits', 'proba', 'log-proba']:
             self.returns = returns
         else:
-            raise ValueError("Attribute ``returns`` must be 'logits', 'sigmoid' or 'log-sigmoid'.")
+            raise ValueError(f"Attribute ``returns`` must be 'logits', 'proba' or 'log-proba', got {returns} instead")
 
         self.messagepassing = MessagePassing(
-            in_channels, n_classes, kernel_size=kernel_size,
+            in_channels, self.n_classes, kernel_size=kernel_size,
             theta_alpha=theta_alpha, theta_beta=theta_beta, theta_gamma=theta_gamma)
-        self.weightfiltering = nn.Parameter(torch.Tensor(1, n_filters, n_classes, 1, 1))
+        self.weightfiltering = nn.Parameter(torch.Tensor(1, n_filters, self.n_classes, 1, 1))
         self.compatibilitytransf = nn.Conv2d( \
-            n_classes, n_classes, kernel_size=1, stride=1, padding=0, bias=False)
+            self.n_classes, self.n_classes, kernel_size=1, stride=1, padding=0, bias=False)
         self._weight_initial()
+
+    def normalize_(self, x):
+        if self.n_classes==1:
+            return x.sigmoid()
+        else:
+            return x.softmax(dim=1)
+
+    def log_norm_(self, x):
+        if self.n_classes==1:
+            return x.log_sigmoid()
+        else:
+            return x.log_softmax(dim=1)
 
     def _weight_initial(self):
         nn.init.kaiming_normal_(self.weightfiltering)
@@ -204,7 +216,7 @@ class CRF(nn.Module):
         """forward method
 
         Args:
-            U (torch.Tensor): unary potentials (Log-likelihoods)
+            U (torch.Tensor): unary potentials (logits)
             I (torch.Tensor): input image
 
         Returns:
@@ -212,8 +224,8 @@ class CRF(nn.Module):
         """
         Q = U.clone()
         for _ in range(self.n_iter):
-            #normalize
-            Q = Q.softmax(dim=1)
+            # normalize
+            Q = self.normalize_(Q)
             #message passing
             Q = self.messagepassing(Q, I)
             #weight filtering
@@ -221,25 +233,20 @@ class CRF(nn.Module):
             Q = Q.sum(dim=1)
             #compatibility transform
             #need to minus Q*weight because sum(mu_l'l * Q_l') with l'#l
-            Q = self.compatibilitytransf(Q) \
-                - Q * self.compatibilitytransf.weight.squeeze().diag().view(1, self.n_classes, 1, 1)
+            if self.n_classes>1:
+                Q = self.compatibilitytransf(Q) - Q * self.compatibilitytransf.weight[:, :, 0, 0].diag().view(1, self.n_classes, 1, 1)
             #adding unary
             Q = U - Q
 
         if self.returns == 'logits':
-            output = Q
-        elif self.returns == 'sigmoid':
-            output = Q.sigmoid()
-        elif self.returns == 'log-sigmoid':
-            output = F.logsigmoid(Q)
+            return Q
+        elif self.returns == 'proba':
+            return self.normalize_(Q)
+        elif self.returns == 'log-proba':
+            return self.log_norm_(Q)
         else:
-            raise ValueError("Attribute ``returns`` must be 'logits', 'sigmoid' or 'log-sigmoid'.")
+            raise ValueError(f"Attribute ``returns`` must be 'logits', 'proba' or 'log-proba', got {self.returns} instead.")
 
-        if self.n_classes == 1:
-            output = output[:, 0] - output[:, 1] if self.returns == 'logits' else output[:, 0]
-            output.unsqueeze_(1)
-
-        return output
 
 # class CRF_2(nn.Module):
 #     """

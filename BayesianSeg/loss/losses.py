@@ -38,6 +38,25 @@ class DiceBCELoss(nn.Module):
         
         return Dice_BCE
     
+class DiceBCEWithLogitsLoss(nn.Module):
+    def __init__(self, reduction=True):
+        super(DiceBCEWithLogitsLoss, self).__init__()
+
+    def __repr__(self):
+        return "DiceBCEWithLogitsLoss"
+    
+    def __str__(self):
+        return "DiceBCEWithLogitsLoss"
+
+    def forward(self, inputs, targets, smooth=1):
+        prob_inputs = inputs.sigmoid()
+        intersection = (prob_inputs * targets).sum()                            
+        dice_loss = 1 - (2.*intersection + smooth)/(prob_inputs.sum() + targets.sum() + smooth)  
+        BCEWithLogits = F.binary_cross_entropy_with_logits(inputs, targets, reduction='mean')
+        Dice_BCE = BCEWithLogits + dice_loss
+        
+        return Dice_BCE
+    
 class CELoss(nn.Module):
     def __init__(self, reduction="mean"):
         super(CELoss, self).__init__()
@@ -52,6 +71,23 @@ class CELoss(nn.Module):
     def forward(self, inputs, targets):
         return F.cross_entropy(inputs, torch.argmax(targets, dim=1), reduction=self.reduction)
 
+class DiceCELoss(nn.Module):
+    def __init__(self, reduction="mean"):
+        super(DiceCELoss, self).__init__()
+
+    def __repr__(self):
+        return "DiceCELoss"
+    
+    def __str__(self):
+        return "DiceCELoss"
+
+    def forward(self, inputs, targets, smooth=1):      
+        intersection = (inputs * targets).sum()                            
+        dice_loss = 1 - (2.*intersection + smooth)/(inputs.sum() + targets.sum() + smooth)  
+        CE = F.cross_entropy(inputs, targets, reduction='mean')
+        Dice_CE = CE + dice_loss
+        
+        return Dice_CE
 
 class IoULoss(nn.Module):
     def __init__(self):

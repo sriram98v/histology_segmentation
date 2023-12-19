@@ -57,20 +57,16 @@ def train(config):
         os.makedirs(config["log_dir"])
         print("Created logs directory at "+config["log_dir"])
 
-    # train_set = DS(DS_NAME, ROOT_DIR, split='train', transforms=[norm_im(), Resize(size=(256, 256)), Rotate(180, fill=1)])
+    train_set = DS(DS_NAME, ROOT_DIR, split='train', transforms=[norm_im(), Resize(size=(256, 256)), Rotate(180, fill=1)])
 
-    # test_set = DS(DS_NAME, ROOT_DIR, split='val', transforms=[norm_im(), Resize(size=(256, 256))])
-
-    train_set = DS("cityscapes", "cityscapes/", split='train', transforms=[PIL_to_tensor(), Resize(size=(256, 256)), class_to_channel(35), norm_im()])#, Rotate(180, fill=1)])
-
-    test_set = DS("cityscapes", "cityscapes/", split='val', transforms=[PIL_to_tensor(), Resize(size=(256, 256)), class_to_channel(35)])
+    test_set = DS(DS_NAME, ROOT_DIR, split='val', transforms=[norm_im(), Resize(size=(256, 256))])
 
     train_loader = DataLoader(train_set, batch_size=TRAIN_BATCH_SIZE, shuffle=True, **kwargs)
     test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, shuffle=False, **kwargs)
 
     model = Frequentist_UNet(3, len(train_set.classes), classes=train_set.classes, bilinear=BILINEAR, out_layer=OUT_LAYER)
     model.to(device=DEVICE)
-    criterion_m = Loss(LOSS, DEVICE, **LOSS_KWARGS)
+    criterion_m = Loss(LOSS, **LOSS_KWARGS)
     criterion_acc = Metric(EVAL_METRIC, **EVAL_KWARGS)
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
@@ -95,6 +91,7 @@ def train(config):
 
                 pbar.update()
                 pbar.set_postfix(**{f"Total_loss": loss.item()})
+                print(imgs)
 
         test_acc = evaluate(model, dataloader=test_loader, device=DEVICE, metric=criterion_acc)
         
@@ -122,24 +119,10 @@ def train(config):
                              "Test": test_acc},
                             epoch)
         
-        if DISPLAY_IDXS==None:
-            DISPLAY_IDXS = list(range(len(train_set.classes)))
-        
-        writer_true_image_test = torch.stack([draw_segmentation_masks((writer_im_test*255).to(device="cpu", dtype=torch.uint8), (writer_tar_test[i]>0.5).to(device="cpu"), colors="#0509f7") for i in DISPLAY_IDXS])
-        writer_pred_image_test = torch.stack([draw_segmentation_masks((writer_im_test*255).to(device="cpu", dtype=torch.uint8), (writer_preds_test[i]>0.5).to(device="cpu"), colors="#0509f7") for i in DISPLAY_IDXS])
-        writer_test = torchvision.utils.make_grid(torch.cat([writer_true_image_test, writer_pred_image_test], dim=-1), nrow=4, padding=10)
+        writer.add_images("images", imgs, global_step=epoch)
+        writer.add_images("gt", true_masks, global_step=epoch)
+        writer.add_images("preds", pred_masks, global_step=epoch)
 
-        if DISPLAY_IDXS==None:
-            DISPLAY_IDXS = list(range(len(train_set.classes)))
-        
-        writer_true_image_train = torch.stack([draw_segmentation_masks((writer_im_train*255).to(device="cpu", dtype=torch.uint8), (writer_tar_train[i]>0.5).to(device="cpu"), colors="#0509f7") for i in DISPLAY_IDXS])
-        writer_pred_image_train = torch.stack([draw_segmentation_masks((writer_im_train*255).to(device="cpu", dtype=torch.uint8), (writer_preds_train[i]>0.5).to(device="cpu"), colors="#0509f7") for i in DISPLAY_IDXS])
-        writer_train = torchvision.utils.make_grid(torch.cat([writer_true_image_train, writer_pred_image_train], dim=-1), nrow=4, padding=10)
-        
-
-        writer.add_image("test", writer_test, global_step=epoch)
-        writer.add_image("train", writer_train, global_step=epoch)
-        writer.add_images("Raw Preds", torch.unsqueeze(writer_preds_test, dim=1), global_step=epoch)
 
         torch.save(model.state_dict(), cp_dir + f'model_ep_backbone{str(epoch)}.pth')
         print(f"\nSaved Checkpoint. Train_loss_backbone: {epoch_loss/len(train_loader):.3f}")
